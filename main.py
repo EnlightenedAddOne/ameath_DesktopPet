@@ -10,14 +10,14 @@ import time
 
 # ============ 配置 ============
 GIF_DIR = "gifs"
-SCALE = 0.5
+SCALE_OPTIONS = [0.3, 0.4, 0.5, 0.6, 0.7]  # 缩放档位
+DEFAULT_SCALE_INDEX = 2  # 默认0.5
 SPEED_X = 3
 SPEED_Y = 2
 TRANSPARENT_COLOR = "pink"
 STOP_CHANCE = 0.005  # 每帧停下的概率（约每秒0.3次）
 STOP_DURATION_MIN = 2000  # 最小停止时间(ms)
 STOP_DURATION_MAX = 5000  # 最大停止时间(ms)
-LAYER_TOPMOST = True  # True=窗口最顶层, False=桌面最底层
 CONFIG_FILE = "config.json"
 
 # Windows API 常量
@@ -27,6 +27,9 @@ SWP_NOSIZE = 0x0001
 SWP_NOMOVE = 0x0002
 SWP_NOACTIVATE = 0x0010
 SWP_SHOWWINDOW = 0x0040
+GWL_EXSTYLE = -20
+WS_EX_LAYERED = 0x00080000
+WS_EX_TRANSPARENT = 0x00000020
 
 # 消息钩子常量
 WH_SHELL = 10
@@ -75,11 +78,17 @@ class WinMessageHook:
 
     def start(self):
         """启动钩子"""
+        # 定义回调函数类型
+        WndProcType = ctypes.WINFUNCTYPE(
+            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int
+        )
 
         def callback(nCode, wParam, lParam):
             return self.shell_hook(nCode, wParam, lParam)
 
-        self.hook = ctypes.windll.user32.SetWindowsHookExW(WH_SHELL, callback, None, 0)
+        self.hook = ctypes.windll.user32.SetWindowsHookExW(
+            WH_SHELL, WndProcType(callback), None, 0
+        )
         if not self.hook:
             return False
 
@@ -115,13 +124,38 @@ def load_config():
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except:
-        return {"layer_topmost": LAYER_TOPMOST}
+        return {"scale_index": DEFAULT_SCALE_INDEX, "auto_startup": False}
 
 
 def save_config(config):
     """保存配置"""
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
+
+
+def set_auto_startup(enable):
+    """设置开机自启"""
+    key = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    value_name = "DesktopPet"
+    script_path = os.path.abspath(__file__)
+
+    try:
+        import winreg
+
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, key, 0, winreg.KEY_ALL_ACCESS
+        ) as reg_key:
+            if enable:
+                winreg.SetValueEx(
+                    reg_key, value_name, 0, winreg.REG_SZ, f'pythonw "{script_path}"'
+                )
+            else:
+                try:
+                    winreg.DeleteValue(reg_key, value_name)
+                except FileNotFoundError:
+                    pass
+    except Exception as e:
+        print(f"设置开机自启失败: {e}")
 
 
 def flip_frames(pil_frames):
@@ -139,19 +173,30 @@ def load_gif_frames(gif_path, scale=1.0):
     pil_frames = []
     delays = []
     gif = Image.open(gif_path)
+    frame = None
     for i in itertools.count():
         try:
             gif.seek(i)
             frame = gif.convert("RGBA")
             w, h = frame.size
-            resized = frame.resize(
-                (int(w * scale), int(h * scale)), Image.Resampling.LANCZOS
-            )
+            new_w, new_h = int(w * scale), int(h * scale)
+            # 确保缩放后尺寸有效
+            if new_w <= 0 or new_h <= 0:
+                new_w = max(1, new_w)
+                new_h = max(1, new_h)
+            resized = frame.resize((new_w, new_h), Image.Resampling.LANCZOS)
             photoimage_frames.append(ImageTk.PhotoImage(resized))
             pil_frames.append(resized)
             delays.append(gif.info.get("duration", 80))
         except EOFError:
             break
+    # 确保至少有一帧
+    if not photoimage_frames and frame is not None:
+        photoimage_frames.append(
+            ImageTk.PhotoImage(frame.resize((100, 100), Image.Resampling.LANCZOS))
+        )
+        pil_frames.append(frame.resize((100, 100), Image.Resampling.LANCZOS))
+        delays.append(80)
     return photoimage_frames, delays, pil_frames
 
 
@@ -162,10 +207,12 @@ class DesktopGif:
 
         # 加载配置
         config = load_config()
-        self.layer_topmost = config.get("layer_topmost", LAYER_TOPMOST)
+        self.scale_index = config.get("scale_index", DEFAULT_SCALE_INDEX)
+        self.auto_startup = config.get("auto_startup", False)
+        self.scale = SCALE_OPTIONS[self.scale_index]
 
         root.overrideredirect(True)
-        root.attributes("-topmost", self.layer_topmost)
+        root.attributes("-topmost", True)  # 默认顶层
         root.config(bg=TRANSPARENT_COLOR)
         root.attributes("-transparentcolor", TRANSPARENT_COLOR)
 
@@ -173,7 +220,7 @@ class DesktopGif:
         # 加载move.gif
         move_path = os.path.join(GIF_DIR, "move.gif")
         self.move_frames, self.move_delays, self.move_pil_frames = load_gif_frames(
-            move_path, SCALE
+            move_path, self.scale
         )
         # 加载翻转的move帧（向左）
         self.move_frames_left = flip_frames(self.move_pil_frames)
@@ -182,7 +229,7 @@ class DesktopGif:
         self.idle_gifs = []
         for i in range(1, 6):
             idle_path = os.path.join(GIF_DIR, f"idle{i}.gif")
-            frames, delays, _ = load_gif_frames(idle_path, SCALE)
+            frames, delays, _ = load_gif_frames(idle_path, self.scale)
             self.idle_gifs.append((frames, delays))
 
         # 当前状态
@@ -206,6 +253,16 @@ class DesktopGif:
         # 强制刷新，让 winfo_x/y 生效
         root.update_idletasks()
 
+        # 设置鼠标穿透（窗口不拦截鼠标事件）
+        try:
+            hwnd = ctypes.windll.user32.FindWindowW(None, None)
+            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            ctypes.windll.user32.SetWindowLongW(
+                hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_TRANSPARENT
+            )
+        except Exception as e:
+            print(f"设置鼠标穿透失败: {e}")
+
         self.screen_w = root.winfo_screenwidth()
         self.screen_h = root.winfo_screenheight()
 
@@ -220,15 +277,47 @@ class DesktopGif:
         hwnd = ctypes.windll.user32.FindWindowW(None, None)
         start_hook(hwnd)
 
-    def update_layer(self, topmost):
-        """更新窗口层级"""
-        global current_topmost
-        self.layer_topmost = topmost
-        current_topmost = topmost
-        self.root.attributes("-topmost", topmost)
+    def set_scale(self, index):
+        """设置缩放"""
+        self.scale_index = index
+        self.scale = SCALE_OPTIONS[index]
         config = load_config()
-        config["layer_topmost"] = topmost
+        config["scale_index"] = index
         save_config(config)
+
+        # 重新加载GIF
+        move_path = os.path.join(GIF_DIR, "move.gif")
+        result = load_gif_frames(move_path, self.scale)
+        if result[0]:  # 确保有帧
+            self.move_frames, self.move_delays, self.move_pil_frames = result
+            self.move_frames_left = flip_frames(self.move_pil_frames)
+        else:
+            print("加载move.gif失败")
+            return
+
+        self.idle_gifs = []
+        for i in range(1, 6):
+            idle_path = os.path.join(GIF_DIR, f"idle{i}.gif")
+            result = load_gif_frames(idle_path, self.scale)
+            if result[0]:
+                self.idle_gifs.append((result[0], result[1]))
+
+        # 确保有idle帧可用
+        if not self.idle_gifs:
+            self.idle_gifs.append((self.move_frames, self.move_delays))
+
+        # 更新窗口大小
+        if self.move_frames:
+            self.w = self.move_frames[0].width()
+            self.h = self.move_frames[0].height()
+            self.root.geometry(f"{self.w}x{self.h}+{int(self.x)}+{int(self.y)}")
+
+        # 重置帧索引，切换到move帧
+        self.frame_index = 0
+        self.current_frames = (
+            self.move_frames if self.moving_right else self.move_frames_left
+        )
+        self.current_delays = self.move_delays
 
     def switch_to_idle(self):
         """切换到随机idle状态"""
@@ -252,8 +341,11 @@ class DesktopGif:
         self.frame_index = 0
 
     def animate(self):
+        if not self.current_frames:
+            self.root.after(100, self.animate)
+            return
         self.label.config(image=self.current_frames[self.frame_index])
-        delay = self.current_delays[self.frame_index]
+        delay = self.current_delays[self.frame_index] if self.current_delays else 100
 
         self.frame_index = (self.frame_index + 1) % len(self.current_frames)
         self.root.after(delay, self.animate)
@@ -316,27 +408,74 @@ if __name__ == "__main__":
         # 创建托盘图标
         icon_image = PILImage.new("RGB", (64, 64), color="pink")
 
-        def on_toggle_layer(icon, item):
-            """切换层级"""
-            new_topmost = not app.layer_topmost
-            app.update_layer(new_topmost)
-            item.checked = new_topmost
-            item.title = "桌面宠物 - " + ("顶层" if new_topmost else "底层")
+        def on_toggle_startup(icon, item):
+            """切换开机自启"""
+            app.auto_startup = not app.auto_startup
+            set_auto_startup(app.auto_startup)
+            config = load_config()
+            config["auto_startup"] = app.auto_startup
+            save_config(config)
+            icon.menu = create_menu(app)
+
+        def on_set_scale(icon, item, index):
+            """设置缩放"""
+            app.set_scale(index)
+            icon.menu = create_menu(app)
 
         def on_quit(icon):
             """退出"""
             icon.stop()
             app.root.destroy()
 
-        # 创建菜单（移除显示窗口选项）
-        menu = (
-            pystray.MenuItem(
-                "切换层级 (当前: 顶层)",
-                on_toggle_layer,
-                checked=lambda item: app.layer_topmost,
-            ),
-            pystray.MenuItem("退出", on_quit),
-        )
+        def on_scale_0(icon, item):
+            on_set_scale(icon, item, 0)
+
+        def on_scale_1(icon, item):
+            on_set_scale(icon, item, 1)
+
+        def on_scale_2(icon, item):
+            on_set_scale(icon, item, 2)
+
+        def on_scale_3(icon, item):
+            on_set_scale(icon, item, 3)
+
+        def on_scale_4(icon, item):
+            on_set_scale(icon, item, 4)
+
+        def create_menu(app_instance):
+            """动态创建菜单"""
+            # 缩放子菜单
+            scale_handlers = [
+                on_scale_0,
+                on_scale_1,
+                on_scale_2,
+                on_scale_3,
+                on_scale_4,
+            ]
+            scale_items = []
+            for i in range(len(SCALE_OPTIONS)):
+                scale_items.append(
+                    pystray.MenuItem(
+                        f"{SCALE_OPTIONS[i]}x",
+                        scale_handlers[i],
+                        checked=lambda it, idx=i: app_instance.scale_index == idx,
+                        radio=True,
+                    )
+                )
+            scale_menu = pystray.Menu(*scale_items)
+
+            return (
+                pystray.MenuItem(
+                    "开机自启",
+                    on_toggle_startup,
+                    checked=lambda it: app_instance.auto_startup,
+                ),
+                pystray.MenuItem("缩放", scale_menu),
+                pystray.MenuItem("退出", on_quit),
+            )
+
+        # 创建菜单
+        menu = create_menu(app)
 
         icon = pystray.Icon("desktop_pet", icon_image, "桌面宠物", menu)
         app.app = icon
