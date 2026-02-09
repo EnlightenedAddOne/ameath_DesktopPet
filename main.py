@@ -270,6 +270,11 @@ class DesktopGif:
         self.vx = SPEED_X
         self.vy = SPEED_Y
 
+        # 绑定拖动事件
+        self.label.bind("<ButtonPress-1>", self.start_drag)
+        self.label.bind("<B1-Motion>", self.do_drag)
+        self.label.bind("<ButtonRelease-1>", self.stop_drag)
+
         self.animate()
         self.move()
 
@@ -277,6 +282,41 @@ class DesktopGif:
         self.root.update_idletasks()
         hwnd = ctypes.windll.user32.FindWindowW(None, None)
         start_hook(hwnd)
+
+    def set_click_through(self, enable):
+        """设置鼠标穿透"""
+        try:
+            hwnd = ctypes.windll.user32.FindWindowW(None, None)
+            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            if enable:
+                ctypes.windll.user32.SetWindowLongW(
+                    hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_TRANSPARENT
+                )
+            else:
+                ctypes.windll.user32.SetWindowLongW(
+                    hwnd, GWL_EXSTYLE, style & ~WS_EX_TRANSPARENT
+                )
+        except Exception as e:
+            print(f"设置鼠标穿透失败: {e}")
+
+    def start_drag(self, event):
+        """开始拖动"""
+        self.dragging = True
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
+
+    def do_drag(self, event):
+        """拖动中"""
+        if self.dragging:
+            dx = event.x - self.drag_start_x
+            dy = event.y - self.drag_start_y
+            self.x += dx
+            self.y += dy
+            self.root.geometry(f"+{int(self.x)}+{int(self.y)}")
+
+    def stop_drag(self, event):
+        """停止拖动"""
+        self.dragging = False
 
     def set_scale(self, index):
         """设置缩放"""
@@ -324,15 +364,17 @@ class DesktopGif:
         """切换暂停/继续"""
         self.is_paused = not self.is_paused
         if self.is_paused:
-            # 暂停：停止移动，切换到idle动画
+            # 暂停：停止移动，切换到idle动画，取消鼠标穿透允许拖动
             self.is_moving = False
+            self.set_click_through(False)  # 取消鼠标穿透
             frames, delays = random.choice(self.idle_gifs)
             self.current_frames = frames
             self.current_delays = delays
             self.frame_index = 0
         else:
-            # 继续：恢复移动
+            # 继续：恢复移动，恢复鼠标穿透
             self.is_moving = True
+            self.set_click_through(True)  # 恢复鼠标穿透
             self.current_frames = (
                 self.move_frames if self.moving_right else self.move_frames_left
             )
