@@ -109,6 +109,21 @@ def save_config(config):
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 
+def get_startup_executable_path():
+    """获取注册表中保存的exe路径（如果有）"""
+    key = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    value_name = "DesktopPet"
+    try:
+        import winreg
+
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, key, 0, winreg.KEY_READ
+        ) as reg_key:
+            return winreg.QueryValueEx(reg_key, value_name)[0]
+    except:
+        return None
+
+
 def set_auto_startup(enable):
     """设置开机自启"""
     key = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -118,11 +133,11 @@ def set_auto_startup(enable):
     if getattr(sys, "frozen", False):
         # 打包后的exe，使用exe本身路径
         executable_path = sys.executable
+        startup_cmd = f'"{executable_path}"'
     else:
         # 开发的py文件，使用pythonw启动
         import winreg
 
-        # 获取pythonw完整路径
         try:
             with winreg.OpenKey(
                 winreg.HKEY_LOCAL_MACHINE,
@@ -133,15 +148,8 @@ def set_auto_startup(enable):
                 python_path, _ = winreg.QueryValueEx(reg_key, "InstallPath")
                 executable_path = os.path.join(python_path, "pythonw.exe")
         except Exception:
-            # 回退到PATH中的pythonw
             executable_path = "pythonw"
-        executable_path = f'{executable_path} "{os.path.abspath(__file__)}"'
-
-    # 实际设置的启动命令
-    if getattr(sys, "frozen", False):
-        startup_cmd = f'"{executable_path}"'
-    else:
-        startup_cmd = executable_path
+        startup_cmd = f'{executable_path} "{os.path.abspath(__file__)}"'
 
     try:
         import winreg
@@ -158,6 +166,20 @@ def set_auto_startup(enable):
                     pass
     except Exception as e:
         print(f"设置开机自启失败: {e}")
+
+
+def check_and_fix_startup():
+    """检查开机自启路径是否正确（exe移动后自动修复）"""
+    if not getattr(sys, "frozen", False):
+        return  # 只处理打包后的exe
+
+    saved_path = get_startup_executable_path()
+    current_path = f'"{sys.executable}"'
+
+    # 如果注册表有记录但路径不一致，说明用户移动了exe，自动更新
+    if saved_path and saved_path != current_path:
+        print(f"检测到exe位置已变更，自动更新开机自启...")
+        set_auto_startup(True)
 
 
 def flip_frames(pil_frames):
@@ -216,6 +238,9 @@ class DesktopGif:
         self.scale_index = config.get("scale_index", DEFAULT_SCALE_INDEX)
         self.auto_startup = config.get("auto_startup", False)
         self.scale = SCALE_OPTIONS[self.scale_index]
+
+        # 检查开机自启路径是否正确（exe移动后自动修复）
+        check_and_fix_startup()
 
         root.overrideredirect(True)
         root.attributes("-topmost", True)  # 默认顶层
