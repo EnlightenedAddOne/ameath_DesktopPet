@@ -20,14 +20,15 @@ STOP_DURATION_MIN = 2000  # 最小停止时间(ms)
 STOP_DURATION_MAX = 5000  # 最大停止时间(ms)
 
 # 运动配置
-EDGE_ESCAPE_CHANCE = 0.2  # 撞边后直接消失概率
+EDGE_ESCAPE_CHANCE = 0.3  # 撞边后直接消失概率（提高）
 RESPAWN_MARGIN = 50  # 重生在屏幕外多少像素
-TARGET_CHANGE_MIN = 80  # 目标点最小帧数
-TARGET_CHANGE_MAX = 200  # 目标点最大帧数
+TARGET_CHANGE_MIN = 200  # 目标点最小帧数（约4秒）
+TARGET_CHANGE_MAX = 500  # 目标点最大帧数（约10秒）
+OUTSIDE_TARGET_CHANCE = 0.4  # 目标点在屏幕外的概率（提高）
 FOLLOW_DISTANCE = 80  # 跟随鼠标保持的距离
-INERTIA_FACTOR = 0.9  # 惯性因子 (越大越平滑)
-INTENT_FACTOR = 0.1  # 意图因子 (越大越快转向目标)
-JITTER = 0.2  # 随机抖动幅度
+INERTIA_FACTOR = 0.95  # 惯性因子 (越大越平滑)
+INTENT_FACTOR = 0.05  # 意图因子 (越小越不容易转向)
+JITTER = 0.15  # 随机抖动幅度
 
 CONFIG_FILE = "config.json"
 
@@ -285,9 +286,8 @@ class DesktopGif:
         self.vx = SPEED_X
         self.vy = SPEED_Y
 
-        # 运动系统：目标点和计时器
-        self.target_x = self.x
-        self.target_y = self.y
+        # 运动系统：目标点和计时器（立即设置一个随机目标，不要当前位置）
+        self.target_x, self.target_y = self.get_random_target()
         self.target_timer = random.randint(TARGET_CHANGE_MIN, TARGET_CHANGE_MAX)
 
         # 绑定拖动事件
@@ -431,11 +431,30 @@ class DesktopGif:
     # ============ 运动系统方法 ============
 
     def get_random_target(self):
-        """获取随机目标点"""
-        return (
-            random.randint(0, self.screen_w - self.w),
-            random.randint(0, self.screen_h - self.h),
-        )
+        """获取随机目标点（偶尔在屏幕外，触发边缘效果）"""
+        # 使用配置的概率，让宠物尝试冲边界
+        if random.random() < OUTSIDE_TARGET_CHANCE:
+            side = random.choice(["left", "right", "top", "bottom"])
+            margin = RESPAWN_MARGIN + 50  # 比重生距离再远一点
+            if side == "left":
+                return (-margin, random.randint(0, self.screen_h - self.h))
+            elif side == "right":
+                return (
+                    self.screen_w + margin,
+                    random.randint(0, self.screen_h - self.h),
+                )
+            elif side == "top":
+                return (random.randint(0, self.screen_w - self.w), -margin)
+            else:  # bottom
+                return (
+                    random.randint(0, self.screen_w - self.w),
+                    self.screen_h + margin,
+                )
+        else:
+            return (
+                random.randint(0, self.screen_w - self.w),
+                random.randint(0, self.screen_h - self.h),
+            )
 
     def get_follow_target(self):
         """获取跟随鼠标的目标点"""
