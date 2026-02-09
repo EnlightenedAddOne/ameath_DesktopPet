@@ -24,6 +24,17 @@ def resource_path(relative_path):
 GIF_DIR = "gifs"
 SCALE_OPTIONS = [0.3, 0.4, 0.5, 0.6, 0.7]  # 缩放档位
 DEFAULT_SCALE_INDEX = 2  # 默认0.5
+TRANSPARENCY_OPTIONS = [
+    1.0,
+    0.9,
+    0.8,
+    0.7,
+    0.6,
+    0.5,
+    0.4,
+    0.3,
+]  # 透明度档位（1.0=不透明）
+DEFAULT_TRANSPARENCY_INDEX = 0  # 默认不透明
 SPEED_X = 3
 SPEED_Y = 2
 TRANSPARENT_COLOR = "pink"
@@ -94,6 +105,7 @@ def load_config():
     except:
         return {
             "scale_index": DEFAULT_SCALE_INDEX,
+            "transparency_index": DEFAULT_TRANSPARENCY_INDEX,
             "auto_startup": False,
             "click_through": True,
             "follow_mouse": False,
@@ -301,6 +313,12 @@ class DesktopGif:
         self.follow_mouse = config.get("follow_mouse", False)
         self.set_click_through(self.click_through)
 
+        # 加载透明度配置并设置
+        self.transparency_index = config.get(
+            "transparency_index", DEFAULT_TRANSPARENCY_INDEX
+        )
+        self.set_transparency(self.transparency_index)
+
         self.screen_w = root.winfo_screenwidth()
         self.screen_h = root.winfo_screenheight()
 
@@ -378,6 +396,16 @@ class DesktopGif:
                 )
         except Exception as e:
             print(f"设置鼠标穿透失败: {e}")
+
+    def set_transparency(self, index):
+        """设置透明度"""
+        self.transparency_index = index
+        alpha = TRANSPARENCY_OPTIONS[index]
+        self.root.attributes("-alpha", alpha)
+        # 保存配置
+        config = load_config()
+        config["transparency_index"] = index
+        save_config(config)
 
     def stop_drag(self, event):
         """停止拖动"""
@@ -860,6 +888,35 @@ if __name__ == "__main__":
         def on_scale_4(icon, item):
             on_set_scale(icon, item, 4)
 
+        def on_set_transparency(icon, item, index):
+            """设置透明度"""
+            app.set_transparency(index)
+            icon.menu = create_menu(app)
+
+        def on_transparency_0(icon, item):
+            on_set_transparency(icon, item, 0)
+
+        def on_transparency_1(icon, item):
+            on_set_transparency(icon, item, 1)
+
+        def on_transparency_2(icon, item):
+            on_set_transparency(icon, item, 2)
+
+        def on_transparency_3(icon, item):
+            on_set_transparency(icon, item, 3)
+
+        def on_transparency_4(icon, item):
+            on_set_transparency(icon, item, 4)
+
+        def on_transparency_5(icon, item):
+            on_set_transparency(icon, item, 5)
+
+        def on_transparency_6(icon, item):
+            on_set_transparency(icon, item, 6)
+
+        def on_transparency_7(icon, item):
+            on_set_transparency(icon, item, 7)
+
         def create_menu(app_instance):
             """动态创建菜单"""
             # 缩放子菜单
@@ -881,6 +938,31 @@ if __name__ == "__main__":
                     )
                 )
             scale_menu = pystray.Menu(*scale_items)
+
+            # 透明度子菜单
+            transparency_handlers = [
+                on_transparency_0,
+                on_transparency_1,
+                on_transparency_2,
+                on_transparency_3,
+                on_transparency_4,
+                on_transparency_5,
+                on_transparency_6,
+                on_transparency_7,
+            ]
+            transparency_items = []
+            for i in range(len(TRANSPARENCY_OPTIONS)):
+                label = f"{int(TRANSPARENCY_OPTIONS[i] * 100)}%"
+                transparency_items.append(
+                    pystray.MenuItem(
+                        label,
+                        transparency_handlers[i],
+                        checked=lambda it, idx=i: app_instance.transparency_index
+                        == idx,
+                        radio=True,
+                    )
+                )
+            transparency_menu = pystray.Menu(*transparency_items)
 
             return (
                 pystray.MenuItem(
@@ -907,6 +989,7 @@ if __name__ == "__main__":
                     checked=lambda it: app_instance.auto_startup,
                 ),
                 pystray.MenuItem("缩放", scale_menu),
+                pystray.MenuItem("透明度", transparency_menu),
                 pystray.MenuItem("退出", on_quit),
             )
 
