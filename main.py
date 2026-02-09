@@ -5,7 +5,20 @@ import random
 import os
 import json
 import ctypes
-import time
+import sys
+
+
+# ============ PyInstaller 资源路径处理 ============
+def resource_path(relative_path):
+    """获取打包后的资源绝对路径"""
+    try:
+        # PyInstaller 创建的临时目录
+        base_path = sys._MEIPASS
+    except AttributeError:
+        # 开发环境
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 
 # ============ 配置 ============
 GIF_DIR = "gifs"
@@ -175,8 +188,8 @@ class DesktopGif:
         root.attributes("-transparentcolor", TRANSPARENT_COLOR)
 
         # ---------- 加载所有GIF ----------
-        # 加载move.gif
-        move_path = os.path.join(GIF_DIR, "move.gif")
+        # 加载move.gif (使用 resource_path 支持打包)
+        move_path = resource_path(os.path.join(GIF_DIR, "move.gif"))
         self.move_frames, self.move_delays, self.move_pil_frames = load_gif_frames(
             move_path, self.scale
         )
@@ -186,7 +199,7 @@ class DesktopGif:
         # 加载idle1~5.gif
         self.idle_gifs = []
         for i in range(1, 6):
-            idle_path = os.path.join(GIF_DIR, f"idle{i}.gif")
+            idle_path = resource_path(os.path.join(GIF_DIR, f"idle{i}.gif"))
             frames, delays, _ = load_gif_frames(idle_path, self.scale)
             self.idle_gifs.append((frames, delays))
 
@@ -305,8 +318,8 @@ class DesktopGif:
         config["scale_index"] = index
         save_config(config)
 
-        # 重新加载GIF
-        move_path = os.path.join(GIF_DIR, "move.gif")
+        # 重新加载GIF (使用 resource_path 支持打包)
+        move_path = resource_path(os.path.join(GIF_DIR, "move.gif"))
         result = load_gif_frames(move_path, self.scale)
         if result[0]:  # 确保有帧
             self.move_frames, self.move_delays, self.move_pil_frames = result
@@ -317,7 +330,7 @@ class DesktopGif:
 
         self.idle_gifs = []
         for i in range(1, 6):
-            idle_path = os.path.join(GIF_DIR, f"idle{i}.gif")
+            idle_path = resource_path(os.path.join(GIF_DIR, f"idle{i}.gif"))
             result = load_gif_frames(idle_path, self.scale)
             if result[0]:
                 self.idle_gifs.append((result[0], result[1]))
@@ -659,7 +672,7 @@ if __name__ == "__main__":
 
         # 创建托盘图标（使用ameath.gif）
         try:
-            icon_gif = Image.open("gifs/ameath.gif")
+            icon_gif = Image.open(resource_path("gifs/ameath.gif"))
             icon_gif.seek(0)  # 取第一帧
             icon_image = icon_gif.convert("RGBA")
             icon_image = icon_image.resize((64, 64), Image.Resampling.LANCZOS)
