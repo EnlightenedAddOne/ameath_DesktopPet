@@ -5,7 +5,6 @@ import random
 import os
 import json
 import ctypes
-import threading
 import time
 
 # ============ 配置 ============
@@ -18,6 +17,10 @@ TRANSPARENT_COLOR = "pink"
 STOP_CHANCE = 0.005  # 每帧停下的概率（约每秒0.3次）
 STOP_DURATION_MIN = 2000  # 最小停止时间(ms)
 STOP_DURATION_MAX = 5000  # 最大停止时间(ms)
+
+# 帧率配置（性能优化）
+MOVE_INTERVAL = 30  # 移动更新间隔(ms) ≈33fps
+JITTER_INTERVAL = 5  # 抖动更新间隔(帧数) 每5帧更新一次随机抖动
 
 # 运动配置
 EDGE_ESCAPE_CHANCE = 0.3  # 撞边后直接消失概率
@@ -63,89 +66,6 @@ SWP_SHOWWINDOW = 0x0040
 GWL_EXSTYLE = -20
 WS_EX_LAYERED = 0x00080000
 WS_EX_TRANSPARENT = 0x00000020
-
-# 消息钩子常量
-WH_SHELL = 10
-HSHELL_WINDOWACTIVATED = 4
-HSHELL_RUDEAPPACTIVATION = 0x8004
-
-# 全局变量
-current_topmost = True  # 当前层级设置
-
-
-class WinMessageHook:
-    """Windows消息钩子，更高效地处理Win+D"""
-
-    def __init__(self, hwnd):
-        self.hwnd = hwnd
-        self.hook = None
-        self.running = True
-        self.keep_topmost = True
-
-    def shell_hook(self, nCode, wParam, lParam):
-        """Shell钩子回调"""
-        if nCode >= 0:
-            # 窗口激活事件
-            if wParam == HSHELL_WINDOWACTIVATED or wParam == HSHELL_RUDEAPPACTIVATION:
-                # 检查目标窗口是否是桌面或任务栏
-                try:
-                    foreground = ctypes.windll.user32.GetForegroundWindow()
-                    class_name = ctypes.create_unicode_buffer(256)
-                    ctypes.windll.user32.GetClassNameW(foreground, class_name, 256)
-
-                    # 如果前台是WorkerW或Progman（桌面窗口），恢复置顶
-                    if "WorkerW" in class_name.value or "Progman" in class_name.value:
-                        ctypes.windll.user32.SetWindowPos(
-                            self.hwnd,
-                            HWND_TOPMOST if self.keep_topmost else HWND_NOTOPMOST,
-                            0,
-                            0,
-                            0,
-                            0,
-                            SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
-                        )
-                except:
-                    pass
-
-        return ctypes.windll.user32.CallNextHookEx(self.hook, nCode, wParam, lParam)
-
-    def start(self):
-        """启动钩子"""
-        # 定义回调函数类型
-        WndProcType = ctypes.WINFUNCTYPE(
-            ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int
-        )
-
-        def callback(nCode, wParam, lParam):
-            return self.shell_hook(nCode, wParam, lParam)
-
-        self.hook = ctypes.windll.user32.SetWindowsHookExW(
-            WH_SHELL, WndProcType(callback), None, 0
-        )
-        if not self.hook:
-            return False
-
-        # 消息循环
-        msg = ctypes.windll.user32.GetMessageW(None, 0, 0)
-        while self.running and msg != 0:
-            ctypes.windll.user32.TranslateMessage(msg)
-            ctypes.windll.user32.DispatchMessageW(msg)
-            msg = ctypes.windll.user32.GetMessageW(None, 0, 0)
-        return True
-
-    def stop(self):
-        """停止钩子"""
-        self.running = False
-        if self.hook:
-            ctypes.windll.user32.UnhookWindowsHookEx(self.hook)
-
-
-def start_hook(hwnd):
-    """启动消息钩子线程"""
-    hook = WinMessageHook(hwnd)
-    hook.keep_topmost = current_topmost
-    threading.Thread(target=hook.start, daemon=True).start()
-    return hook
 
 
 # ==============================
@@ -323,15 +243,35 @@ class DesktopGif:
         self.animate()
         self.move()
 
-        # 启动Windows消息钩子（应对Win+D）
+        # 获取正确的窗口句柄
         self.root.update_idletasks()
-        hwnd = ctypes.windll.user32.FindWindowW(None, None)
-        start_hook(hwnd)
+        self.hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+
+        # 启动轻量级置顶轮询（替代Shell Hook）
+        self.root.after(2000, self.ensure_topmost)
+
+    def ensure_topmost(self):
+        """轻量级置顶轮询（替代Shell Hook）"""
+        if not self.is_paused:  # 只在非暂停时确保置顶
+            try:
+                ctypes.windll.user32.SetWindowPos(
+                    self.hwnd,
+                    HWND_TOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+                )
+            except:
+                pass
+        self.root.after(2000, self.ensure_topmost)
 
     def set_click_through(self, enable):
         """设置鼠标穿透"""
         try:
-            hwnd = ctypes.windll.user32.FindWindowW(None, None)
+            # 动态获取窗口句柄
+            hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
             style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
             if enable:
                 ctypes.windll.user32.SetWindowLongW(
@@ -550,7 +490,7 @@ class DesktopGif:
         self.root.after(delay, self.animate)
 
     def move(self):
-        """运动状态机主循环"""
+        """运动状态机主循环（性能优化版）"""
         # 暂停时停止所有运动
         if self.is_paused:
             self.root.after(100, self.move)
@@ -558,15 +498,21 @@ class DesktopGif:
 
         # ============ 休息状态 ============
         if self.motion_state == MOTION_REST:
-            self.rest_timer -= 20
+            self.rest_timer -= MOVE_INTERVAL
             if self.rest_timer <= 0:
                 # 休息结束，恢复游荡
                 self.motion_state = MOTION_WANDER
                 self.target_x, self.target_y = self.get_random_target()
                 self.target_timer = random.randint(TARGET_CHANGE_MIN, TARGET_CHANGE_MAX)
                 self.switch_to_move()
-            self.root.after(20, self.move)
+            self.root.after(MOVE_INTERVAL, self.move)
             return
+
+        # ============ 鼠标位置缓存 ============
+        mx = self.root.winfo_pointerx()
+        my = self.root.winfo_pointery()
+        mouse_moved = (mx, my) != getattr(self, "_last_mouse", (mx, my))
+        self._last_mouse = (mx, my)
 
         # ============ 计算到目标的距离 ============
         dx = self.target_x - self.x
@@ -577,8 +523,6 @@ class DesktopGif:
 
         # 跟随模式：根据距离切换follow/curious
         if self.follow_mouse:
-            mx = self.root.winfo_pointerx()
-            my = self.root.winfo_pointery()
             dist_mouse = ((mx - self.x) ** 2 + (my - self.y) ** 2) ** 0.5
 
             if dist_mouse > FOLLOW_START_DIST:
@@ -593,7 +537,7 @@ class DesktopGif:
                 self.motion_state = MOTION_REST
                 self.rest_timer = random.randint(REST_DURATION_MIN, REST_DURATION_MAX)
                 self.switch_to_idle()
-                self.root.after(20, self.move)
+                self.root.after(MOVE_INTERVAL, self.move)
                 return
             else:
                 # 继续游荡，换个目标
@@ -617,29 +561,22 @@ class DesktopGif:
         else:
             speed_mul = 1.0
 
-        # ============ 跟随/好奇模式：实时更新目标 ============
+        # ============ 跟随/好奇模式：只在鼠标移动时更新目标 ============
         if self.motion_state in (MOTION_FOLLOW, MOTION_CURIOUS):
-            mx = self.root.winfo_pointerx()
-            my = self.root.winfo_pointery()
-
-            if self.motion_state == MOTION_FOLLOW:
-                # 跟随：在鼠标附近
-                offset = FOLLOW_DISTANCE
-                self.target_x = mx + random.randint(-offset, offset)
-                self.target_y = my + random.randint(-offset, offset)
-            else:  # curious
-                # 好奇：在更近的范围晃动
-                offset = FOLLOW_STOP_DIST
+            if mouse_moved:  # 只有鼠标移动时才更新目标
+                if self.motion_state == MOTION_FOLLOW:
+                    offset = FOLLOW_DISTANCE
+                else:  # curious
+                    offset = FOLLOW_STOP_DIST
                 self.target_x = mx + random.randint(-offset, offset)
                 self.target_y = my + random.randint(-offset, offset)
 
-            # 重新计算距离（用于碰撞检测）
-            dx = self.target_x - self.x
-            dy = self.target_y - self.y
-            dist = max(1, (dx * dx + dy * dy) ** 0.5)
+                # 重新计算距离
+                dx = self.target_x - self.x
+                dy = self.target_y - self.y
+                dist = max(1, (dx * dx + dy * dy) ** 0.5)
 
         # ============ 朝目标移动（惯性 + 意图） ============
-        # 朝目标的"意图速度"
         desired_vx = dx / dist * SPEED_X * speed_mul
         desired_vy = dy / dist * SPEED_Y * speed_mul
 
@@ -647,9 +584,16 @@ class DesktopGif:
         self.vx = self.vx * INERTIA_FACTOR + desired_vx * INTENT_FACTOR
         self.vy = self.vy * INERTIA_FACTOR + desired_vy * INTENT_FACTOR
 
-        # 添加随机抖动
-        self.vx += random.uniform(-JITTER, JITTER)
-        self.vy += random.uniform(-JITTER, JITTER)
+        # ============ 抖动降频：每N帧更新一次 ============
+        if not hasattr(self, "_move_tick"):
+            self._move_tick = 0
+        self._move_tick += 1
+
+        if self._move_tick % JITTER_INTERVAL == 0:
+            self._jitter_x = random.uniform(-JITTER, JITTER)
+            self._jitter_y = random.uniform(-JITTER, JITTER)
+        self.vx += getattr(self, "_jitter_x", 0)
+        self.vy += getattr(self, "_jitter_y", 0)
 
         # 应用移动
         self.x += self.vx
@@ -692,9 +636,14 @@ class DesktopGif:
                 self.current_delays = self.move_delays
                 self.frame_index = 0
 
-        self.root.geometry(f"+{int(self.x)}+{int(self.y)}")
+        # 只在位置明显变化时更新geometry
+        ix, iy = int(self.x), int(self.y)
+        last_pos = getattr(self, "_last_pos", None)
+        if (ix, iy) != last_pos:
+            self.root.geometry(f"+{ix}+{iy}")
+            self._last_pos = (ix, iy)
 
-        self.root.after(20, self.move)
+        self.root.after(MOVE_INTERVAL, self.move)
 
 
 if __name__ == "__main__":
