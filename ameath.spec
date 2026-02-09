@@ -1,16 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
-import os
+
 
 a = Analysis(
     ['main.py'],
-    pathex=['.'],
+    pathex=[],
     binaries=[],
     datas=[('gifs', 'gifs')],
-    hiddenimports=[],
+    hiddenimports=['PIL._tkinter'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['numpy', 'matplotlib', 'asyncio', 'test'],
     noarchive=False,
     optimize=0,
 )
@@ -20,6 +20,7 @@ exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
+    a.zipfiles,
     a.datas,
     [],
     name='ameath',
@@ -35,5 +36,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['gifs\\ameath.ico'],
+    icon='gifs\\ameath.ico',
 )
