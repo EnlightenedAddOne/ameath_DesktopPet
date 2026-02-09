@@ -124,7 +124,11 @@ def load_config():
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except:
-        return {"scale_index": DEFAULT_SCALE_INDEX, "auto_startup": False}
+        return {
+            "scale_index": DEFAULT_SCALE_INDEX,
+            "auto_startup": False,
+            "click_through": True,
+        }
 
 
 def save_config(config):
@@ -239,6 +243,9 @@ class DesktopGif:
         self.is_paused = False  # 暂停状态
         self.moving_right = True  # 当前移动方向
         self.frame_index = 0
+        self.dragging = False  # 拖动状态
+        self.drag_start_x = 0
+        self.drag_start_y = 0
 
         self.label = tk.Label(root, bg=TRANSPARENT_COLOR, bd=0)
         self.label.pack()
@@ -254,15 +261,10 @@ class DesktopGif:
         # 强制刷新，让 winfo_x/y 生效
         root.update_idletasks()
 
-        # 设置鼠标穿透（窗口不拦截鼠标事件）
-        try:
-            hwnd = ctypes.windll.user32.FindWindowW(None, None)
-            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-            ctypes.windll.user32.SetWindowLongW(
-                hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_TRANSPARENT
-            )
-        except Exception as e:
-            print(f"设置鼠标穿透失败: {e}")
+        # 加载鼠标穿透配置并设置
+        config = load_config()
+        self.click_through = config.get("click_through", True)
+        self.set_click_through(self.click_through)
 
         self.screen_w = root.winfo_screenwidth()
         self.screen_h = root.winfo_screenheight()
@@ -298,12 +300,6 @@ class DesktopGif:
                 )
         except Exception as e:
             print(f"设置鼠标穿透失败: {e}")
-
-    def start_drag(self, event):
-        """开始拖动"""
-        self.dragging = True
-        self.drag_start_x = event.x
-        self.drag_start_y = event.y
 
     def do_drag(self, event):
         """拖动中"""
@@ -364,22 +360,28 @@ class DesktopGif:
         """切换暂停/继续"""
         self.is_paused = not self.is_paused
         if self.is_paused:
-            # 暂停：停止移动，切换到idle动画，取消鼠标穿透允许拖动
+            # 暂停：停止移动，切换到idle动画
             self.is_moving = False
-            self.set_click_through(False)  # 取消鼠标穿透
             frames, delays = random.choice(self.idle_gifs)
             self.current_frames = frames
             self.current_delays = delays
             self.frame_index = 0
         else:
-            # 继续：恢复移动，恢复鼠标穿透
+            # 继续：恢复移动
             self.is_moving = True
-            self.set_click_through(True)  # 恢复鼠标穿透
             self.current_frames = (
                 self.move_frames if self.moving_right else self.move_frames_left
             )
             self.current_delays = self.move_delays
             self.frame_index = 0
+
+    def start_drag(self, event):
+        """开始拖动（鼠标穿透关闭时才可用）"""
+        if self.click_through:
+            return
+        self.dragging = True
+        self.drag_start_x = event.x
+        self.drag_start_y = event.y
 
     def switch_to_idle(self):
         """切换到随机idle状态（随机停下功能）"""
@@ -513,6 +515,15 @@ if __name__ == "__main__":
             icon.stop()
             app.root.destroy()
 
+        def on_toggle_click_through(icon, item):
+            """切换鼠标穿透"""
+            app.click_through = not app.click_through
+            app.set_click_through(app.click_through)
+            config = load_config()
+            config["click_through"] = app.click_through
+            save_config(config)
+            icon.menu = create_menu(app)
+
         def on_scale_0(icon, item):
             on_set_scale(icon, item, 0)
 
@@ -558,6 +569,11 @@ if __name__ == "__main__":
                 pystray.MenuItem(
                     "暂停" if not app_instance.is_paused else "继续",
                     on_toggle_pause,
+                ),
+                pystray.MenuItem(
+                    "鼠标穿透",
+                    on_toggle_click_through,
+                    checked=lambda it: app_instance.click_through,
                 ),
                 pystray.MenuItem(
                     "开机自启",
