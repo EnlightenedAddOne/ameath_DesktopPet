@@ -920,6 +920,12 @@ if __name__ == "__main__":
         def on_scale_6(icon, item):
             on_set_scale(icon, item, 6)
 
+        def on_scale_7(icon, item):
+            on_set_scale(icon, item, 7)
+
+        def on_scale_8(icon, item):
+            on_set_scale(icon, item, 8)
+
         def on_set_transparency(icon, item, index):
             """设置透明度"""
             app.set_transparency(index)
@@ -1009,6 +1015,8 @@ if __name__ == "__main__":
                 on_scale_4,
                 on_scale_5,
                 on_scale_6,
+                on_scale_7,
+                on_scale_8,
             ]
             scale_items = []
             for i in range(len(SCALE_OPTIONS)):
