@@ -1,68 +1,40 @@
 # Ameath - 桌面宠物
 
-一个可爱又智能的桌面宠物应用，让你的Windows桌面充满生机！
+*"爱弥斯，拉贝尔学部的隧者适格者！不过，那都是生前的事了。现在的我，是电子幽灵哦~"*
 
-![Ameath 桌面宠物](gifs/ameath.gif)
+<p align="center">
+  <img src="gifs/ameath.gif" alt="Ameath 桌面宠物" width="50%">
+</p>
 
 ## ✨ 特色功能
 
 ### 🤖 智能行为系统
+
 - **随机游荡** - 宠物会在屏幕上自由漫步，探索各个角落
 - **跟随鼠标** - 当你移动鼠标时，宠物会好奇地跟过来
 - **自动休息** - 走累了会停下来休息，休息够了继续活动
 - **边缘冲撞** - 偶尔会冲向屏幕边缘，触发有趣的出屏/反弹效果
 
 ### 🎨 精美动画
+
 - 多套 idle 动画（5种不同的待机动作）
 - 流畅的移动动画，支持左右方向自动切换
 - 暂停/继续功能，随心控制
 
 ### 🎛️ 灵活设置
+
 - **5档缩放** - 0.3x ~ 0.7x，随心调整宠物大小
 - **鼠标穿透** - 让宠物不遮挡你的操作
 - **开机自启** - 开机自动运行，陪伴你每一天
 - **托盘图标** - 最小化到系统托盘，不占任务栏
 
 ### 🔧 技术特点
+
 - **分辨率自适应** - 自动适配任意分辨率屏幕
 - **轻量级** - 基于 Python + Tkinter，资源占用极低
 - **单文件分发** - PyInstaller 打包，开箱即用
 
 ## 📦 安装方式
-
-### 方式一：下载打包版本（推荐）
-
-1. 下载最新的 `ameath.exe` 文件
-2. 将文件解压到任意目录
-3. 双击运行 `ameath.exe`
-
-> ⚠️ **重要**：确保 `ameath.exe` 所在目录包含 `gifs/` 文件夹
-
-### 方式二：源码运行
-
-```bash
-# 克隆仓库
-git clone https://github.com/你的用户名/ameath.git
-cd ameath
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 运行
-python main.py
-```
-
-### 方式三：从源码打包
-
-```bash
-# 安装 PyInstaller
-pip install pyinstaller
-
-# 打包
-pyinstaller ameath.spec
-
-# 打包后的文件在 dist/ 目录
-```
 
 ## 🎮 使用说明
 
@@ -116,17 +88,8 @@ ameath/
 
 ## 🤝 贡献
 
-欢迎提交 Issue 和 Pull Request！
-
-## 📄 许可证
-
-MIT License
-
-## 🔗 相关链接
-
-- **GitHub**: https://github.com/你的用户名/ameath
-- **Gitee**: https://gitee.com/你的用户名/ameath
+欢迎 fork 仓库或者提交 Issue 和 Pull Request！
 
 ---
 
-*让桌面更有温度 - Ameath*
+*但愿我会让你感到骄傲，但愿我没有让你失望 - Ameath*
