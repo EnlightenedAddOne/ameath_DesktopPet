@@ -7,6 +7,15 @@ import json
 import ctypes
 import sys
 
+# 启用 Windows DPI 感知（解决高DPI屏幕模糊问题）
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)  # PROCESS_PER_MONITOR_DPI_AWARE
+except:
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except:
+        pass
+
 
 # ============ PyInstaller 资源路径处理 ============
 def resource_path(relative_path):
@@ -22,8 +31,8 @@ def resource_path(relative_path):
 
 # ============ 配置 ============
 GIF_DIR = "gifs"
-SCALE_OPTIONS = [0.3, 0.4, 0.5, 0.6, 0.7]  # 缩放档位
-DEFAULT_SCALE_INDEX = 2  # 默认0.5
+SCALE_OPTIONS = [0.3, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9]  # 缩放档位（适配高DPI）
+DEFAULT_SCALE_INDEX = 2  # 默认0.7
 TRANSPARENCY_OPTIONS = [
     1.0,
     0.9,
@@ -35,6 +44,11 @@ TRANSPARENCY_OPTIONS = [
     0.3,
 ]  # 透明度档位（1.0=不透明）
 DEFAULT_TRANSPARENCY_INDEX = 0  # 默认不透明
+
+# 软件信息
+VERSION = "1.1"
+AUTHOR_BILIBILI = "-fugu-"
+AUTHOR_EMAIL = "1977184420@qq.com"
 SPEED_X = 3
 SPEED_Y = 2
 TRANSPARENT_COLOR = "pink"
@@ -888,6 +902,12 @@ if __name__ == "__main__":
         def on_scale_4(icon, item):
             on_set_scale(icon, item, 4)
 
+        def on_scale_5(icon, item):
+            on_set_scale(icon, item, 5)
+
+        def on_scale_6(icon, item):
+            on_set_scale(icon, item, 6)
+
         def on_set_transparency(icon, item, index):
             """设置透明度"""
             app.set_transparency(index)
@@ -917,6 +937,55 @@ if __name__ == "__main__":
         def on_transparency_7(icon, item):
             on_set_transparency(icon, item, 7)
 
+        def on_about(icon, item):
+            """显示关于信息"""
+            about_window = tk.Toplevel(app.root)
+            about_window.title("飞吧，朝向春天")
+            about_window.geometry("350x220")
+            about_window.resizable(False, False)
+            about_window.attributes("-topmost", True)
+
+            # 设置窗口图标（与托盘图标一致）
+            try:
+                icon_image = PILImage.open(resource_path("gifs/ameath.gif"))
+                icon_image = icon_image.resize((32, 32), Image.Resampling.LANCZOS)
+                icon_pil = icon_image.convert("RGBA")
+                app_icon = ImageTk.PhotoImage(icon_pil)
+                about_window.iconphoto(True, app_icon)  # type: ignore
+            except:
+                pass
+
+            # 居中显示
+            about_window.update_idletasks()
+            x = (about_window.winfo_screenwidth() - 350) // 2
+            y = (about_window.winfo_screenheight() - 220) // 2
+            about_window.geometry(f"+{x}+{y}")
+
+            # 内容
+            tk.Label(
+                about_window,
+                text="飞吧，朝向春天",
+                font=("Microsoft YaHei UI", 16, "bold"),
+            ).pack(pady=(20, 10))
+            tk.Label(
+                about_window, text=f"版本: {VERSION}", font=("Microsoft YaHei UI", 11)
+            ).pack()
+            tk.Label(
+                about_window,
+                text=f"作者B站: {AUTHOR_BILIBILI}",
+                font=("Microsoft YaHei UI", 11),
+            ).pack(pady=(8, 0))
+            tk.Label(
+                about_window,
+                text=f"邮箱: {AUTHOR_EMAIL}",
+                font=("Microsoft YaHei UI", 11),
+            ).pack(pady=(8, 0))
+
+            # 关闭按钮
+            tk.Button(
+                about_window, text="确定", command=about_window.destroy, width=10
+            ).pack(pady=(20, 10))
+
         def create_menu(app_instance):
             """动态创建菜单"""
             # 缩放子菜单
@@ -926,6 +995,8 @@ if __name__ == "__main__":
                 on_scale_2,
                 on_scale_3,
                 on_scale_4,
+                on_scale_5,
+                on_scale_6,
             ]
             scale_items = []
             for i in range(len(SCALE_OPTIONS)):
@@ -990,6 +1061,7 @@ if __name__ == "__main__":
                 ),
                 pystray.MenuItem("缩放", scale_menu),
                 pystray.MenuItem("透明度", transparency_menu),
+                pystray.MenuItem("关于", on_about),
                 pystray.MenuItem("退出", on_quit),
             )
 
