@@ -20,15 +20,36 @@ STOP_DURATION_MIN = 2000  # 最小停止时间(ms)
 STOP_DURATION_MAX = 5000  # 最大停止时间(ms)
 
 # 运动配置
-EDGE_ESCAPE_CHANCE = 0.3  # 撞边后直接消失概率（提高）
+EDGE_ESCAPE_CHANCE = 0.3  # 撞边后直接消失概率
 RESPAWN_MARGIN = 50  # 重生在屏幕外多少像素
 TARGET_CHANGE_MIN = 200  # 目标点最小帧数（约4秒）
 TARGET_CHANGE_MAX = 500  # 目标点最大帧数（约10秒）
-OUTSIDE_TARGET_CHANCE = 0.4  # 目标点在屏幕外的概率（提高）
+OUTSIDE_TARGET_CHANCE = 0.4  # 目标点在屏幕外的概率
 FOLLOW_DISTANCE = 80  # 跟随鼠标保持的距离
-INERTIA_FACTOR = 0.95  # 惯性因子 (越大越平滑)
-INTENT_FACTOR = 0.05  # 意图因子 (越小越不容易转向)
+INERTIA_FACTOR = 0.95  # 惯性因子
+INTENT_FACTOR = 0.05  # 意图因子
 JITTER = 0.15  # 随机抖动幅度
+
+# 状态机配置
+MOTION_WANDER = "wander"  # 随机游荡
+MOTION_FOLLOW = "follow"  # 跟随鼠标
+MOTION_CURIOUS = "curious"  # 好奇：近距离观察
+MOTION_REST = "rest"  # 休息：停下不动
+
+# 状态参数
+REST_CHANCE = 0.6  # 到达目标后休息的概率
+REST_DURATION_MIN = 1000  # 休息最小时间(ms)
+REST_DURATION_MAX = 3000  # 休息最大时间(ms)
+REST_DISTANCE = 20  # 到达目标的判定距离
+
+# 跟随参数
+FOLLOW_START_DIST = 200  # 开始跟随的距离
+FOLLOW_STOP_DIST = 60  # 停止跟随/好奇的距离
+
+# 速度倍率
+SPEED_WANDER = 0.8  # 游荡速度
+SPEED_FOLLOW = 1.2  # 跟随速度
+SPEED_CURIOUS = 0.5  # 好奇速度（慢）
 
 CONFIG_FILE = "config.json"
 
@@ -290,6 +311,10 @@ class DesktopGif:
         self.target_x, self.target_y = self.get_random_target()
         self.target_timer = random.randint(TARGET_CHANGE_MIN, TARGET_CHANGE_MAX)
 
+        # 状态机变量
+        self.motion_state = MOTION_WANDER  # 当前运动状态
+        self.rest_timer = 0  # 休息计时器
+
         # 绑定拖动事件
         self.label.bind("<ButtonPress-1>", self.start_drag)
         self.label.bind("<B1-Motion>", self.do_drag)
@@ -525,88 +550,149 @@ class DesktopGif:
         self.root.after(delay, self.animate)
 
     def move(self):
-        # 暂停时停止移动
+        """运动状态机主循环"""
+        # 暂停时停止所有运动
         if self.is_paused:
             self.root.after(100, self.move)
             return
 
-        if self.is_moving:
-            # 随机决定是否停下（只在非跟随模式时）
-            if not self.follow_mouse and random.random() < STOP_CHANCE:
+        # ============ 休息状态 ============
+        if self.motion_state == MOTION_REST:
+            self.rest_timer -= 20
+            if self.rest_timer <= 0:
+                # 休息结束，恢复游荡
+                self.motion_state = MOTION_WANDER
+                self.target_x, self.target_y = self.get_random_target()
+                self.target_timer = random.randint(TARGET_CHANGE_MIN, TARGET_CHANGE_MAX)
+                self.switch_to_move()
+            self.root.after(20, self.move)
+            return
+
+        # ============ 计算到目标的距离 ============
+        dx = self.target_x - self.x
+        dy = self.target_y - self.y
+        dist = (dx * dx + dy * dy) ** 0.5
+
+        # ============ 状态判断与切换 ============
+
+        # 跟随模式：根据距离切换follow/curious
+        if self.follow_mouse:
+            mx = self.root.winfo_pointerx()
+            my = self.root.winfo_pointery()
+            dist_mouse = ((mx - self.x) ** 2 + (my - self.y) ** 2) ** 0.5
+
+            if dist_mouse > FOLLOW_START_DIST:
+                self.motion_state = MOTION_FOLLOW
+            elif dist_mouse < FOLLOW_STOP_DIST:
+                self.motion_state = MOTION_CURIOUS
+
+        # 游荡模式：到达目标后决定是否休息
+        elif self.motion_state == MOTION_WANDER and dist < REST_DISTANCE:
+            if random.random() < REST_CHANCE:
+                # 休息一下
+                self.motion_state = MOTION_REST
+                self.rest_timer = random.randint(REST_DURATION_MIN, REST_DURATION_MAX)
                 self.switch_to_idle()
+                self.root.after(20, self.move)
+                return
             else:
-                # ============ 更新目标点 ============
-                if self.follow_mouse:
-                    # 跟随模式：实时追踪鼠标
-                    self.target_x, self.target_y = self.get_follow_target()
-                else:
-                    # 随机游荡模式：定时更换目标
-                    self.target_timer -= 1
-                    if self.target_timer <= 0:
-                        self.target_x, self.target_y = self.get_random_target()
-                        self.target_timer = random.randint(
-                            TARGET_CHANGE_MIN, TARGET_CHANGE_MAX
-                        )
+                # 继续游荡，换个目标
+                self.target_x, self.target_y = self.get_random_target()
+                self.target_timer = random.randint(TARGET_CHANGE_MIN, TARGET_CHANGE_MAX)
 
-                # ============ 朝目标移动（惯性 + 意图） ============
-                dx = self.target_x - self.x
-                dy = self.target_y - self.y
-                dist = max(1, (dx * dx + dy * dy) ** 0.5)
+        # ============ 定时更换目标（仅游荡模式） ============
+        if self.motion_state == MOTION_WANDER:
+            self.target_timer -= 1
+            if self.target_timer <= 0:
+                self.target_x, self.target_y = self.get_random_target()
+                self.target_timer = random.randint(TARGET_CHANGE_MIN, TARGET_CHANGE_MAX)
 
-                # 朝目标的"意图速度"
-                desired_vx = dx / dist * SPEED_X
-                desired_vy = dy / dist * SPEED_Y
+        # ============ 计算速度倍率 ============
+        if self.motion_state == MOTION_WANDER:
+            speed_mul = SPEED_WANDER
+        elif self.motion_state == MOTION_FOLLOW:
+            speed_mul = SPEED_FOLLOW
+        elif self.motion_state == MOTION_CURIOUS:
+            speed_mul = SPEED_CURIOUS
+        else:
+            speed_mul = 1.0
 
-                # 惯性融合
-                self.vx = self.vx * INERTIA_FACTOR + desired_vx * INTENT_FACTOR
-                self.vy = self.vy * INERTIA_FACTOR + desired_vy * INTENT_FACTOR
+        # ============ 跟随/好奇模式：实时更新目标 ============
+        if self.motion_state in (MOTION_FOLLOW, MOTION_CURIOUS):
+            mx = self.root.winfo_pointerx()
+            my = self.root.winfo_pointery()
 
-                # 添加随机抖动
-                self.vx += random.uniform(-JITTER, JITTER)
-                self.vy += random.uniform(-JITTER, JITTER)
+            if self.motion_state == MOTION_FOLLOW:
+                # 跟随：在鼠标附近
+                offset = FOLLOW_DISTANCE
+                self.target_x = mx + random.randint(-offset, offset)
+                self.target_y = my + random.randint(-offset, offset)
+            else:  # curious
+                # 好奇：在更近的范围晃动
+                offset = FOLLOW_STOP_DIST
+                self.target_x = mx + random.randint(-offset, offset)
+                self.target_y = my + random.randint(-offset, offset)
 
-                # 应用移动
-                self.x += self.vx
-                self.y += self.vy
+            # 重新计算距离（用于碰撞检测）
+            dx = self.target_x - self.x
+            dy = self.target_y - self.y
+            dist = max(1, (dx * dx + dy * dy) ** 0.5)
 
-                # ============ 边缘处理 ============
-                if not self.handle_edge():
-                    # 没出屏时才检查边界碰撞
-                    hit_edge = False
-                    if self.x <= 0:
-                        self.x = 0
-                        self.vx = abs(self.vx)  # 向右反弹
-                        hit_edge = True
-                    elif self.x + self.w >= self.screen_w:
-                        self.x = self.screen_w - self.w
-                        self.vx = -abs(self.vx)  # 向左反弹
-                        hit_edge = True
+        # ============ 朝目标移动（惯性 + 意图） ============
+        # 朝目标的"意图速度"
+        desired_vx = dx / dist * SPEED_X * speed_mul
+        desired_vy = dy / dist * SPEED_Y * speed_mul
 
-                    if self.y <= 0:
-                        self.y = 0
-                        self.vy = abs(self.vy)  # 向下
-                        hit_edge = True
-                    elif self.y + self.h >= self.screen_h:
-                        self.y = self.screen_h - self.h
-                        self.vy = -abs(self.vy)  # 向上
-                        hit_edge = True
+        # 惯性融合
+        self.vx = self.vx * INERTIA_FACTOR + desired_vx * INTENT_FACTOR
+        self.vy = self.vy * INERTIA_FACTOR + desired_vy * INTENT_FACTOR
 
-                    # 检测移动方向变化，更新帧（加阈值防止鬼畜）
-                    new_moving_right = self.vx > 0.5
-                    new_moving_left = self.vx < -0.5
+        # 添加随机抖动
+        self.vx += random.uniform(-JITTER, JITTER)
+        self.vy += random.uniform(-JITTER, JITTER)
 
-                    if new_moving_right and not self.moving_right:
-                        self.moving_right = True
-                        self.current_frames = self.move_frames
-                        self.current_delays = self.move_delays
-                        self.frame_index = 0
-                    elif new_moving_left and self.moving_right:
-                        self.moving_right = False
-                        self.current_frames = self.move_frames_left
-                        self.current_delays = self.move_delays
-                        self.frame_index = 0
+        # 应用移动
+        self.x += self.vx
+        self.y += self.vy
 
-                self.root.geometry(f"+{int(self.x)}+{int(self.y)}")
+        # ============ 边缘处理 ============
+        if not self.handle_edge():
+            # 没出屏时才检查边界碰撞
+            hit_edge = False
+            if self.x <= 0:
+                self.x = 0
+                self.vx = abs(self.vx)  # 向右反弹
+                hit_edge = True
+            elif self.x + self.w >= self.screen_w:
+                self.x = self.screen_w - self.w
+                self.vx = -abs(self.vx)  # 向左反弹
+                hit_edge = True
+
+            if self.y <= 0:
+                self.y = 0
+                self.vy = abs(self.vy)  # 向下
+                hit_edge = True
+            elif self.y + self.h >= self.screen_h:
+                self.y = self.screen_h - self.h
+                self.vy = -abs(self.vy)  # 向上
+                hit_edge = True
+
+            # 撞边时更新方向状态
+            new_moving_right = self.vx > 0.5
+            new_moving_left = self.vx < -0.5
+
+            if new_moving_right and not self.moving_right:
+                self.moving_right = True
+                self.current_frames = self.move_frames
+                self.current_delays = self.move_delays
+                self.frame_index = 0
+            elif new_moving_left and self.moving_right:
+                self.moving_right = False
+                self.current_frames = self.move_frames_left
+                self.current_delays = self.move_delays
+                self.frame_index = 0
+
+        self.root.geometry(f"+{int(self.x)}+{int(self.y)}")
 
         self.root.after(20, self.move)
 
