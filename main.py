@@ -584,6 +584,13 @@ class DesktopGif:
 
         # ============ 状态判断与切换 ============
 
+        # 如果关闭了跟随模式，强制重置为游荡模式
+        if not self.follow_mouse and self.motion_state in (
+            MOTION_FOLLOW,
+            MOTION_CURIOUS,
+        ):
+            self.motion_state = MOTION_WANDER
+
         # 跟随模式：根据距离切换follow/curious
         if self.follow_mouse:
             dist_mouse = ((mx - self.x) ** 2 + (my - self.y) ** 2) ** 0.5
@@ -846,7 +853,7 @@ if __name__ == "__main__":
         # 创建菜单
         menu = create_menu(app)
 
-        icon = pystray.Icon("desktop_pet", icon_image, "桌面宠物", menu)
+        icon = pystray.Icon("desktop_pet", icon_image, "远航星", menu)
         app.app = icon
 
         # 延迟启动托盘，让窗口先显示
