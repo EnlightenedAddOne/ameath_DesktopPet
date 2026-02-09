@@ -7,6 +7,7 @@ import json
 import ctypes
 import sys
 import subprocess
+from pystray import MenuItem  # 显式导入，解决打包后MenuItem不可用问题
 
 # 启用 Windows DPI 感知（解决高DPI屏幕模糊问题）
 try:
@@ -271,6 +272,12 @@ class DesktopGif:
         self.root = root
         self._request_quit = False  # 退出标志（主线程统一收尾）
 
+        # 立即设置无边框，避免闪烁
+        root.overrideredirect(True)
+        root.attributes("-topmost", True)
+        root.config(bg=TRANSPARENT_COLOR)
+        root.attributes("-transparentcolor", TRANSPARENT_COLOR)
+
         # 加载配置
         config = load_config()
         self.scale_index = config.get("scale_index", DEFAULT_SCALE_INDEX)
@@ -279,11 +286,6 @@ class DesktopGif:
 
         # 检查开机自启路径是否正确（exe移动后自动修复）
         check_and_fix_startup()
-
-        root.overrideredirect(True)
-        root.attributes("-topmost", True)  # 默认顶层
-        root.config(bg=TRANSPARENT_COLOR)
-        root.attributes("-transparentcolor", TRANSPARENT_COLOR)
 
         # ---------- 加载所有GIF ----------
         # 加载move.gif (使用 resource_path 支持打包)
@@ -832,14 +834,18 @@ class DesktopGif:
 
 if __name__ == "__main__":
     root = tk.Tk()
+    # 立即隐藏窗口，避免闪烁
+    root.withdraw()
 
     # 尝试导入pystray
     try:
         import pystray
         from PIL import Image as PILImage
 
+        # 先隐藏窗口，避免边框闪烁
+        root.withdraw()
+
         app = DesktopGif(root)
-        # 不隐藏窗口，直接显示
 
         # 创建托盘图标（使用ameath.gif）
         try:
@@ -1108,8 +1114,9 @@ if __name__ == "__main__":
         icon = pystray.Icon("desktop_pet", icon_image, "远航星", menu)
         app.app = icon
 
-        # 延迟启动托盘，让窗口先显示
+        # 延迟启动托盘，让窗口完全初始化后再显示
         root.update_idletasks()
+        root.deiconify()  # 显示窗口（避免边框闪烁）
         root.after(500, lambda: icon.run_detached())
 
         root.mainloop()
@@ -1117,5 +1124,6 @@ if __name__ == "__main__":
     except ImportError:
         # 没有pystray时正常运行窗口
         print("未安装pystray，将只显示窗口。可运行: pip install pystray")
+        root.deiconify()  # 显示窗口
         DesktopGif(root)
         root.mainloop()

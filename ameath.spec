@@ -3,26 +3,23 @@ import os
 
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=['.'],
     binaries=[],
     datas=[('gifs', 'gifs')],
-    hiddenimports=['PIL._tkinter'],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['numpy', 'matplotlib', 'asyncio', 'test'],
+    excludes=[],
     noarchive=False,
+    optimize=0,
 )
-
-a.binaries += TOC([('tk84.dll', 'tk84.dll', 'BINARY'), ('tcl84.dll', 'tcl84.dll', 'BINARY')])
-
 pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
-    a.zipfiles,
     a.datas,
     [],
     name='ameath',
@@ -38,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='gifs\\ameath.ico',
+    icon=['gifs\\ameath.ico'],
 )
