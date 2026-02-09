@@ -13,7 +13,7 @@ def resource_path(relative_path):
     """获取打包后的资源绝对路径"""
     try:
         # PyInstaller 创建的临时目录
-        base_path = sys._MEIPASS
+        base_path = sys._MEIPASS  # type: ignore
     except AttributeError:
         # 开发环境
         base_path = os.path.abspath(".")
@@ -203,9 +203,13 @@ def load_gif_frames(gif_path, scale=1.0):
 
 
 class DesktopGif:
+    from typing import Any
+
+    app: Any = None  # 用于系统托盘
+
     def __init__(self, root):
         self.root = root
-        self.app = None  # 用于系统托盘
+        self._request_quit = False  # 退出标志（主线程统一收尾）
 
         # 加载配置
         config = load_config()
@@ -294,6 +298,9 @@ class DesktopGif:
         # 启动轻量级置顶轮询（替代Shell Hook）
         self.root.after(2000, self.ensure_topmost)
 
+        # 启动退出轮询（主线程统一收尾）
+        self.root.after(100, self.check_quit)
+
     def ensure_topmost(self):
         """轻量级置顶轮询（替代Shell Hook）"""
         if not self.is_paused:  # 只在非暂停时确保置顶
@@ -310,6 +317,18 @@ class DesktopGif:
             except:
                 pass
         self.root.after(2000, self.ensure_topmost)
+
+    def check_quit(self):
+        """主线程轮询退出标志（确保托盘在主线程正确销毁）"""
+        if self._request_quit:
+            try:
+                if hasattr(self, "app") and self.app:
+                    self.app.stop()  # 在主线程 stop 托盘
+            except:
+                pass
+            self.root.destroy()
+            return
+        self.root.after(100, self.check_quit)
 
     def set_click_through(self, enable):
         """设置鼠标穿透"""
@@ -739,12 +758,8 @@ if __name__ == "__main__":
             icon.menu = create_menu(app)
 
         def on_quit(icon):
-            """退出"""
-            icon.stop()
-            app.root.destroy()
-            import sys
-
-            sys.exit(0)
+            """退出（只发信号，主线程统一收尾）"""
+            app._request_quit = True
 
         def on_toggle_click_through(icon, item):
             """切换鼠标穿透"""
