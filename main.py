@@ -6,6 +6,7 @@ import os
 import json
 import ctypes
 import sys
+import subprocess
 
 # 启用 Windows DPI 感知（解决高DPI屏幕模糊问题）
 try:
@@ -29,6 +30,17 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+def get_version():
+    """自动获取当前git标签版本"""
+    try:
+        version = subprocess.check_output(
+            ["git", "describe", "--tags", "--abbrev=0"], text=True
+        ).strip()
+        return version
+    except:
+        return "dev"
+
+
 # ============ 配置 ============
 GIF_DIR = "gifs"
 SCALE_OPTIONS = [0.3, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9]  # 缩放档位（适配高DPI）
@@ -46,7 +58,7 @@ TRANSPARENCY_OPTIONS = [
 DEFAULT_TRANSPARENCY_INDEX = 0  # 默认不透明
 
 # 软件信息
-VERSION = "1.1"
+VERSION = get_version()
 AUTHOR_BILIBILI = "-fugu-"
 AUTHOR_EMAIL = "1977184420@qq.com"
 SPEED_X = 3
