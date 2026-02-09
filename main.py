@@ -18,6 +18,17 @@ TRANSPARENT_COLOR = "pink"
 STOP_CHANCE = 0.005  # 每帧停下的概率（约每秒0.3次）
 STOP_DURATION_MIN = 2000  # 最小停止时间(ms)
 STOP_DURATION_MAX = 5000  # 最大停止时间(ms)
+
+# 运动配置
+EDGE_ESCAPE_CHANCE = 0.2  # 撞边后直接消失概率
+RESPAWN_MARGIN = 50  # 重生在屏幕外多少像素
+TARGET_CHANGE_MIN = 80  # 目标点最小帧数
+TARGET_CHANGE_MAX = 200  # 目标点最大帧数
+FOLLOW_DISTANCE = 80  # 跟随鼠标保持的距离
+INERTIA_FACTOR = 0.9  # 惯性因子 (越大越平滑)
+INTENT_FACTOR = 0.1  # 意图因子 (越大越快转向目标)
+JITTER = 0.2  # 随机抖动幅度
+
 CONFIG_FILE = "config.json"
 
 # Windows API 常量
@@ -128,6 +139,7 @@ def load_config():
             "scale_index": DEFAULT_SCALE_INDEX,
             "auto_startup": False,
             "click_through": True,
+            "follow_mouse": False,
         }
 
 
@@ -264,6 +276,7 @@ class DesktopGif:
         # 加载鼠标穿透配置并设置
         config = load_config()
         self.click_through = config.get("click_through", True)
+        self.follow_mouse = config.get("follow_mouse", False)
         self.set_click_through(self.click_through)
 
         self.screen_w = root.winfo_screenwidth()
@@ -271,6 +284,11 @@ class DesktopGif:
 
         self.vx = SPEED_X
         self.vy = SPEED_Y
+
+        # 运动系统：目标点和计时器
+        self.target_x = self.x
+        self.target_y = self.y
+        self.target_timer = random.randint(TARGET_CHANGE_MIN, TARGET_CHANGE_MAX)
 
         # 绑定拖动事件
         self.label.bind("<ButtonPress-1>", self.start_drag)
@@ -410,6 +428,73 @@ class DesktopGif:
         self.current_delays = self.move_delays
         self.frame_index = 0
 
+    # ============ 运动系统方法 ============
+
+    def get_random_target(self):
+        """获取随机目标点"""
+        return (
+            random.randint(0, self.screen_w - self.w),
+            random.randint(0, self.screen_h - self.h),
+        )
+
+    def get_follow_target(self):
+        """获取跟随鼠标的目标点"""
+        mx = self.root.winfo_pointerx()
+        my = self.root.winfo_pointery()
+        # 保持一定距离，不要贴脸
+        offset = FOLLOW_DISTANCE
+        tx = mx + random.randint(-offset, offset)
+        ty = my + random.randint(-offset, offset)
+        # 限制在屏幕内
+        tx = max(0, min(self.screen_w - self.w, tx))
+        ty = max(0, min(self.screen_h - self.h, ty))
+        return tx, ty
+
+    def respawn_from_edge(self):
+        """从屏幕边缘外侧重生"""
+        side = random.choice(["left", "right", "top", "bottom"])
+        if side == "left":
+            self.x = -RESPAWN_MARGIN
+            self.y = random.randint(0, self.screen_h - self.h)
+        elif side == "right":
+            self.x = self.screen_w + RESPAWN_MARGIN
+            self.y = random.randint(0, self.screen_h - self.h)
+        elif side == "top":
+            self.y = -RESPAWN_MARGIN
+            self.x = random.randint(0, self.screen_w - self.w)
+        else:  # bottom
+            self.y = self.screen_h + RESPAWN_MARGIN
+            self.x = random.randint(0, self.screen_w - self.w)
+
+        # 给一点入场速度
+        self.vx = random.choice([-3, 3])
+        self.vy = random.randint(-2, 2)
+
+    def handle_edge(self):
+        """处理边缘：反弹或出屏重生"""
+        escaped = False
+
+        # 检测是否出屏
+        if self.x < -self.w or self.x > self.screen_w:
+            escaped = True
+        if self.y < -self.h or self.y > self.screen_h:
+            escaped = True
+
+        if escaped:
+            if random.random() < EDGE_ESCAPE_CHANCE:
+                self.respawn_from_edge()
+                return True
+            else:
+                # 反弹
+                self.vx = -self.vx
+                self.vy = -self.vy
+                # 拉回屏幕内
+                self.x = max(0, min(self.screen_w - self.w, self.x))
+                self.y = max(0, min(self.screen_h - self.h, self.y))
+        return False
+
+    # ============ 动画方法 ============
+
     def animate(self):
         if not self.current_frames:
             self.root.after(100, self.animate)
@@ -427,44 +512,82 @@ class DesktopGif:
             return
 
         if self.is_moving:
-            # 随机决定是否停下
-            if random.random() < STOP_CHANCE:
+            # 随机决定是否停下（只在非跟随模式时）
+            if not self.follow_mouse and random.random() < STOP_CHANCE:
                 self.switch_to_idle()
             else:
-                # 用自己维护的坐标，不再信 winfo_x/y
+                # ============ 更新目标点 ============
+                if self.follow_mouse:
+                    # 跟随模式：实时追踪鼠标
+                    self.target_x, self.target_y = self.get_follow_target()
+                else:
+                    # 随机游荡模式：定时更换目标
+                    self.target_timer -= 1
+                    if self.target_timer <= 0:
+                        self.target_x, self.target_y = self.get_random_target()
+                        self.target_timer = random.randint(
+                            TARGET_CHANGE_MIN, TARGET_CHANGE_MAX
+                        )
+
+                # ============ 朝目标移动（惯性 + 意图） ============
+                dx = self.target_x - self.x
+                dy = self.target_y - self.y
+                dist = max(1, (dx * dx + dy * dy) ** 0.5)
+
+                # 朝目标的"意图速度"
+                desired_vx = dx / dist * SPEED_X
+                desired_vy = dy / dist * SPEED_Y
+
+                # 惯性融合
+                self.vx = self.vx * INERTIA_FACTOR + desired_vx * INTENT_FACTOR
+                self.vy = self.vy * INERTIA_FACTOR + desired_vy * INTENT_FACTOR
+
+                # 添加随机抖动
+                self.vx += random.uniform(-JITTER, JITTER)
+                self.vy += random.uniform(-JITTER, JITTER)
+
+                # 应用移动
                 self.x += self.vx
                 self.y += self.vy
 
-                # 撞墙处理（并拉回边界）
-                direction_changed = False
-                if self.x <= 0:
-                    self.x = 0
-                    self.vx = -self.vx
-                    direction_changed = True
-                elif self.x + self.w >= self.screen_w:
-                    self.x = self.screen_w - self.w
-                    self.vx = -self.vx
-                    direction_changed = True
+                # ============ 边缘处理 ============
+                if not self.handle_edge():
+                    # 没出屏时才检查边界碰撞
+                    hit_edge = False
+                    if self.x <= 0:
+                        self.x = 0
+                        self.vx = abs(self.vx)  # 向右反弹
+                        hit_edge = True
+                    elif self.x + self.w >= self.screen_w:
+                        self.x = self.screen_w - self.w
+                        self.vx = -abs(self.vx)  # 向左反弹
+                        hit_edge = True
 
-                if self.y <= 0:
-                    self.y = 0
-                    self.vy = -self.vy
-                elif self.y + self.h >= self.screen_h:
-                    self.y = self.screen_h - self.h
-                    self.vy = -self.vy
+                    if self.y <= 0:
+                        self.y = 0
+                        self.vy = abs(self.vy)  # 向下
+                        hit_edge = True
+                    elif self.y + self.h >= self.screen_h:
+                        self.y = self.screen_h - self.h
+                        self.vy = -abs(self.vy)  # 向上
+                        hit_edge = True
 
-                # 方向改变时切换帧
-                if direction_changed:
-                    self.moving_right = self.vx > 0
-                    if not self.is_moving:
-                        self.is_moving = True  # 恢复移动时切换方向
-                    self.current_frames = (
-                        self.move_frames if self.moving_right else self.move_frames_left
-                    )
-                    self.current_delays = self.move_delays
-                    self.frame_index = 0
+                    # 检测移动方向变化，更新帧（加阈值防止鬼畜）
+                    new_moving_right = self.vx > 0.5
+                    new_moving_left = self.vx < -0.5
 
-                self.root.geometry(f"+{self.x}+{self.y}")
+                    if new_moving_right and not self.moving_right:
+                        self.moving_right = True
+                        self.current_frames = self.move_frames
+                        self.current_delays = self.move_delays
+                        self.frame_index = 0
+                    elif new_moving_left and self.moving_right:
+                        self.moving_right = False
+                        self.current_frames = self.move_frames_left
+                        self.current_delays = self.move_delays
+                        self.frame_index = 0
+
+                self.root.geometry(f"+{int(self.x)}+{int(self.y)}")
 
         self.root.after(20, self.move)
 
@@ -524,6 +647,14 @@ if __name__ == "__main__":
             save_config(config)
             icon.menu = create_menu(app)
 
+        def on_toggle_follow(icon, item):
+            """切换跟随鼠标"""
+            app.follow_mouse = not app.follow_mouse
+            config = load_config()
+            config["follow_mouse"] = app.follow_mouse
+            save_config(config)
+            icon.menu = create_menu(app)
+
         def on_scale_0(icon, item):
             on_set_scale(icon, item, 0)
 
@@ -569,6 +700,11 @@ if __name__ == "__main__":
                 pystray.MenuItem(
                     "暂停" if not app_instance.is_paused else "继续",
                     on_toggle_pause,
+                ),
+                pystray.MenuItem(
+                    "跟随鼠标",
+                    on_toggle_follow,
+                    checked=lambda it: app_instance.follow_mouse,
                 ),
                 pystray.MenuItem(
                     "鼠标穿透",
