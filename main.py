@@ -657,8 +657,15 @@ if __name__ == "__main__":
         app = DesktopGif(root)
         # 不隐藏窗口，直接显示
 
-        # 创建托盘图标
-        icon_image = PILImage.new("RGB", (64, 64), color="pink")
+        # 创建托盘图标（使用ameath.gif）
+        try:
+            icon_gif = Image.open("gifs/ameath.gif")
+            icon_gif.seek(0)  # 取第一帧
+            icon_image = icon_gif.convert("RGBA")
+            icon_image = icon_image.resize((64, 64), Image.Resampling.LANCZOS)
+        except Exception as e:
+            print(f"加载托盘图标失败，使用默认图标: {e}")
+            icon_image = PILImage.new("RGB", (64, 64), color="pink")
 
         def on_toggle_startup(icon, item):
             """切换开机自启"""
