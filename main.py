@@ -65,9 +65,9 @@ AUTHOR_EMAIL = "1977184420@qq.com"
 SPEED_X = 3
 SPEED_Y = 2
 TRANSPARENT_COLOR = "pink"
-STOP_CHANCE = 0.005  # 每帧停下的概率（约每秒0.3次）
-STOP_DURATION_MIN = 2000  # 最小停止时间(ms)
-STOP_DURATION_MAX = 5000  # 最大停止时间(ms)
+STOP_CHANCE = 0.003  # 每帧停下的概率
+STOP_DURATION_MIN = 4000  # 最小停止时间(ms)
+STOP_DURATION_MAX = 8000  # 最大停止时间(ms)
 
 # 帧率配置（性能优化）
 MOVE_INTERVAL = 30  # 移动更新间隔(ms) ≈33fps
@@ -674,6 +674,13 @@ class DesktopGif:
         if self.dragging:
             self.root.after(50, self.move)
             return
+
+        # ============ 随机停下休息（游荡模式专属） ============
+        if self.motion_state == MOTION_WANDER and self.is_moving:
+            if random.random() < STOP_CHANCE:
+                self.switch_to_idle()
+                self.root.after(MOVE_INTERVAL, self.move)
+                return
 
         # ============ 休息状态 ============
         if self.motion_state == MOTION_REST:
