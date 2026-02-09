@@ -231,12 +231,16 @@ class DesktopGif:
         # 加载翻转的move帧（向左）
         self.move_frames_left = flip_frames(self.move_pil_frames)
 
-        # 加载idle1~5.gif
+        # 加载idle1~4.gif（idle5已改为idle4）
         self.idle_gifs = []
-        for i in range(1, 6):
+        for i in range(1, 5):
             idle_path = resource_path(os.path.join(GIF_DIR, f"idle{i}.gif"))
             frames, delays, _ = load_gif_frames(idle_path, self.scale)
             self.idle_gifs.append((frames, delays))
+
+        # 加载drag.gif（拖动时显示）
+        drag_path = resource_path(os.path.join(GIF_DIR, "drag.gif"))
+        self.drag_frames, self.drag_delays, _ = load_gif_frames(drag_path, self.scale)
 
         # 当前状态
         self.current_frames = self.move_frames
@@ -248,6 +252,9 @@ class DesktopGif:
         self.dragging = False  # 拖动状态
         self.drag_start_x = 0
         self.drag_start_y = 0
+        self._pre_drag_frames = None  # 保存拖动前的帧
+        self._pre_drag_delays = None
+        self._drag_animating = False  # 拖动时是否在播放动画
 
         self.label = tk.Label(root, bg=TRANSPARENT_COLOR, bd=0)
         self.label.pack()
@@ -347,18 +354,14 @@ class DesktopGif:
         except Exception as e:
             print(f"设置鼠标穿透失败: {e}")
 
-    def do_drag(self, event):
-        """拖动中"""
-        if self.dragging:
-            dx = event.x - self.drag_start_x
-            dy = event.y - self.drag_start_y
-            self.x += dx
-            self.y += dy
-            self.root.geometry(f"+{int(self.x)}+{int(self.y)}")
-
     def stop_drag(self, event):
         """停止拖动"""
         self.dragging = False
+        # 恢复拖动前的帧
+        if self._pre_drag_frames is not None:
+            self.current_frames = self._pre_drag_frames
+            self.current_delays = self._pre_drag_delays
+            self.frame_index = 0
 
     def set_scale(self, index):
         """设置缩放"""
@@ -379,11 +382,17 @@ class DesktopGif:
             return
 
         self.idle_gifs = []
-        for i in range(1, 6):
+        for i in range(1, 5):
             idle_path = resource_path(os.path.join(GIF_DIR, f"idle{i}.gif"))
             result = load_gif_frames(idle_path, self.scale)
             if result[0]:
                 self.idle_gifs.append((result[0], result[1]))
+
+        # 重新加载drag.gif
+        drag_path = resource_path(os.path.join(GIF_DIR, "drag.gif"))
+        drag_result = load_gif_frames(drag_path, self.scale)
+        if drag_result[0]:
+            self.drag_frames, self.drag_delays, _ = drag_result
 
         # 确保有idle帧可用
         if not self.idle_gifs:
@@ -426,8 +435,25 @@ class DesktopGif:
         if self.click_through:
             return
         self.dragging = True
+        # 记录鼠标相对于窗口左上角的偏移量
         self.drag_start_x = event.x
         self.drag_start_y = event.y
+        # 保存当前帧状态
+        self._pre_drag_frames = self.current_frames
+        self._pre_drag_delays = self.current_delays
+        # 切换到drag静态帧（只显示第一帧）
+        self.current_frames = self.drag_frames
+        self.current_delays = [1000] * len(self.drag_frames)
+        self.frame_index = 0
+        self.label.config(image=self.current_frames[0])
+
+    def do_drag(self, event):
+        """拖动中"""
+        if self.dragging:
+            # 窗口左上角 = 鼠标当前位置 - 偏移量
+            self.x = event.x_root - self.drag_start_x
+            self.y = event.y_root - self.drag_start_y
+            self.root.geometry(f"+{int(self.x)}+{int(self.y)}")
 
     def switch_to_idle(self):
         """切换到随机idle状态（随机停下功能）"""
@@ -546,6 +572,10 @@ class DesktopGif:
         if not self.current_frames:
             self.root.after(100, self.animate)
             return
+        # 拖动时不更新帧（静态显示）
+        if self.dragging:
+            self.root.after(50, self.animate)
+            return
         self.label.config(image=self.current_frames[self.frame_index])
         delay = self.current_delays[self.frame_index] if self.current_delays else 100
 
@@ -557,6 +587,11 @@ class DesktopGif:
         # 暂停时停止所有运动
         if self.is_paused:
             self.root.after(100, self.move)
+            return
+
+        # 拖动时停止自动运动
+        if self.dragging:
+            self.root.after(50, self.move)
             return
 
         # ============ 休息状态 ============
