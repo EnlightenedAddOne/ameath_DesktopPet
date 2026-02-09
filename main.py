@@ -236,6 +236,7 @@ class DesktopGif:
         self.current_frames = self.move_frames
         self.current_delays = self.move_delays
         self.is_moving = True
+        self.is_paused = False  # 暂停状态
         self.moving_right = True  # 当前移动方向
         self.frame_index = 0
 
@@ -319,8 +320,30 @@ class DesktopGif:
         )
         self.current_delays = self.move_delays
 
+    def toggle_pause(self):
+        """切换暂停/继续"""
+        self.is_paused = not self.is_paused
+        if self.is_paused:
+            # 暂停：停止移动，切换到idle动画
+            self.is_moving = False
+            frames, delays = random.choice(self.idle_gifs)
+            self.current_frames = frames
+            self.current_delays = delays
+            self.frame_index = 0
+        else:
+            # 继续：恢复移动
+            self.is_moving = True
+            self.current_frames = (
+                self.move_frames if self.moving_right else self.move_frames_left
+            )
+            self.current_delays = self.move_delays
+            self.frame_index = 0
+
     def switch_to_idle(self):
-        """切换到随机idle状态"""
+        """切换到随机idle状态（随机停下功能）"""
+        # 如果是暂停状态，不处理
+        if self.is_paused:
+            return
         self.is_moving = False
         frames, delays = random.choice(self.idle_gifs)
         self.current_frames = frames
@@ -333,6 +356,9 @@ class DesktopGif:
 
     def switch_to_move(self):
         """切换到移动状态"""
+        # 如果是暂停状态，不处理
+        if self.is_paused:
+            return
         self.is_moving = True
         self.current_frames = (
             self.move_frames if self.moving_right else self.move_frames_left
@@ -351,6 +377,11 @@ class DesktopGif:
         self.root.after(delay, self.animate)
 
     def move(self):
+        # 暂停时停止移动
+        if self.is_paused:
+            self.root.after(100, self.move)
+            return
+
         if self.is_moving:
             # 随机决定是否停下
             if random.random() < STOP_CHANCE:
@@ -417,6 +448,19 @@ if __name__ == "__main__":
             save_config(config)
             icon.menu = create_menu(app)
 
+        def on_toggle_visible(icon, item):
+            """切换隐藏/显示"""
+            if app.root.state() == "withdrawn":
+                app.root.deiconify()
+            else:
+                app.root.withdraw()
+            icon.menu = create_menu(app)
+
+        def on_toggle_pause(icon, item):
+            """切换暂停/继续"""
+            app.toggle_pause()
+            icon.menu = create_menu(app)
+
         def on_set_scale(icon, item, index):
             """设置缩放"""
             app.set_scale(index)
@@ -465,6 +509,14 @@ if __name__ == "__main__":
             scale_menu = pystray.Menu(*scale_items)
 
             return (
+                pystray.MenuItem(
+                    "隐藏" if app_instance.root.state() == "normal" else "显示",
+                    on_toggle_visible,
+                ),
+                pystray.MenuItem(
+                    "暂停" if not app_instance.is_paused else "继续",
+                    on_toggle_pause,
+                ),
                 pystray.MenuItem(
                     "开机自启",
                     on_toggle_startup,
