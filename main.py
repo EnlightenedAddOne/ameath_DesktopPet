@@ -44,7 +44,7 @@ def get_version():
 # ============ 配置 ============
 GIF_DIR = "gifs"
 SCALE_OPTIONS = [0.3, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9]  # 缩放档位（适配高DPI）
-DEFAULT_SCALE_INDEX = 2  # 默认0.7
+DEFAULT_SCALE_INDEX = 3
 TRANSPARENCY_OPTIONS = [
     1.0,
     0.9,
@@ -959,14 +959,14 @@ if __name__ == "__main__":
             """显示关于信息"""
             about_window = tk.Toplevel(app.root)
             about_window.title("飞吧，朝向春天")
-            about_window.geometry("350x220")
+            about_window.geometry("700x480")
             about_window.resizable(False, False)
             about_window.attributes("-topmost", True)
 
             # 设置窗口图标（与托盘图标一致）
             try:
                 icon_image = PILImage.open(resource_path("gifs/ameath.gif"))
-                icon_image = icon_image.resize((32, 32), Image.Resampling.LANCZOS)
+                icon_image = icon_image.resize((64, 64), Image.Resampling.LANCZOS)
                 icon_pil = icon_image.convert("RGBA")
                 app_icon = ImageTk.PhotoImage(icon_pil)
                 about_window.iconphoto(True, app_icon)  # type: ignore
@@ -975,34 +975,51 @@ if __name__ == "__main__":
 
             # 居中显示
             about_window.update_idletasks()
-            x = (about_window.winfo_screenwidth() - 350) // 2
-            y = (about_window.winfo_screenheight() - 220) // 2
+            screen_w = about_window.winfo_screenwidth()
+            screen_h = about_window.winfo_screenheight()
+            x = (screen_w - 700) // 2
+            y = (screen_h - 480) // 2
             about_window.geometry(f"+{x}+{y}")
+
+            # 使用 Frame 添加内边距
+            padding_frame = tk.Frame(about_window, padx=50, pady=35)
+            padding_frame.pack(fill=tk.BOTH, expand=True)
 
             # 内容
             tk.Label(
-                about_window,
+                padding_frame,
                 text="飞吧，朝向春天",
-                font=("Microsoft YaHei UI", 16, "bold"),
-            ).pack(pady=(20, 10))
+                font=("Microsoft YaHei UI", 26, "bold"),
+            ).pack(pady=(0, 35))
+
             tk.Label(
-                about_window, text=f"版本: {VERSION}", font=("Microsoft YaHei UI", 11)
+                padding_frame,
+                text=f"版本: {VERSION}",
+                font=("Microsoft YaHei UI", 16),
             ).pack()
+
             tk.Label(
-                about_window,
+                padding_frame,
                 text=f"作者B站: {AUTHOR_BILIBILI}",
-                font=("Microsoft YaHei UI", 11),
-            ).pack(pady=(8, 0))
+                font=("Microsoft YaHei UI", 16),
+            ).pack(pady=(25, 0))
+
             tk.Label(
-                about_window,
+                padding_frame,
                 text=f"邮箱: {AUTHOR_EMAIL}",
-                font=("Microsoft YaHei UI", 11),
-            ).pack(pady=(8, 0))
+                font=("Microsoft YaHei UI", 16),
+                wraplength=600,  # 自动换行
+                justify=tk.LEFT,
+            ).pack(pady=(25, 0))
 
             # 关闭按钮
             tk.Button(
-                about_window, text="确定", command=about_window.destroy, width=10
-            ).pack(pady=(20, 10))
+                padding_frame,
+                text="确定",
+                command=about_window.destroy,
+                width=12,
+                font=("Microsoft YaHei UI", 14),
+            ).pack(pady=(40, 0))
 
         def create_menu(app_instance):
             """动态创建菜单"""
