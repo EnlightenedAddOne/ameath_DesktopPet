@@ -67,7 +67,9 @@ SPEED_WANDER = 0.8  # 游荡速度
 SPEED_FOLLOW = 1.2  # 跟随速度
 SPEED_CURIOUS = 0.5  # 好奇速度（慢）
 
-CONFIG_FILE = "config.json"
+CONFIG_FILE = os.path.join(
+    os.environ.get("APPDATA", os.path.expanduser("~")), "ameath_config.json"
+)
 
 # Windows API 常量
 HWND_TOPMOST = -1
@@ -100,6 +102,9 @@ def load_config():
 
 def save_config(config):
     """保存配置"""
+    config_dir = os.path.dirname(CONFIG_FILE)
+    if config_dir and not os.path.exists(config_dir):
+        os.makedirs(config_dir, exist_ok=True)
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
@@ -108,7 +113,35 @@ def set_auto_startup(enable):
     """设置开机自启"""
     key = r"Software\Microsoft\Windows\CurrentVersion\Run"
     value_name = "DesktopPet"
-    script_path = os.path.abspath(__file__)
+
+    # 检测程序是否打包成exe
+    if getattr(sys, "frozen", False):
+        # 打包后的exe，使用exe本身路径
+        executable_path = sys.executable
+    else:
+        # 开发的py文件，使用pythonw启动
+        import winreg
+
+        # 获取pythonw完整路径
+        try:
+            with winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Python\PythonCore\3.*\InstallPath",
+                0,
+                winreg.KEY_READ,
+            ) as reg_key:
+                python_path, _ = winreg.QueryValueEx(reg_key, "InstallPath")
+                executable_path = os.path.join(python_path, "pythonw.exe")
+        except Exception:
+            # 回退到PATH中的pythonw
+            executable_path = "pythonw"
+        executable_path = f'{executable_path} "{os.path.abspath(__file__)}"'
+
+    # 实际设置的启动命令
+    if getattr(sys, "frozen", False):
+        startup_cmd = f'"{executable_path}"'
+    else:
+        startup_cmd = executable_path
 
     try:
         import winreg
@@ -117,9 +150,7 @@ def set_auto_startup(enable):
             winreg.HKEY_CURRENT_USER, key, 0, winreg.KEY_ALL_ACCESS
         ) as reg_key:
             if enable:
-                winreg.SetValueEx(
-                    reg_key, value_name, 0, winreg.REG_SZ, f'pythonw "{script_path}"'
-                )
+                winreg.SetValueEx(reg_key, value_name, 0, winreg.REG_SZ, startup_cmd)
             else:
                 try:
                     winreg.DeleteValue(reg_key, value_name)
@@ -711,6 +742,9 @@ if __name__ == "__main__":
             """退出"""
             icon.stop()
             app.root.destroy()
+            import sys
+
+            sys.exit(0)
 
         def on_toggle_click_through(icon, item):
             """切换鼠标穿透"""
