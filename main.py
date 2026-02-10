@@ -33,13 +33,80 @@ def resource_path(relative_path):
 
 def get_version():
     """自动获取当前git标签版本"""
+    # 1. 优先读取 version.txt（打包后独立运行）
+    try:
+        version_path = resource_path("version.txt")
+        if os.path.exists(version_path):
+            with open(version_path, "r", encoding="utf-8") as f:
+                version = f.read().strip()
+            if version:
+                return version
+    except Exception:
+        pass
+
+    # 2. 回退：尝试从 git 获取
     try:
         version = subprocess.check_output(
-            ["git", "describe", "--tags", "--abbrev=0"], text=True
+            ["git", "describe", "--tags", "--abbrev=0"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            text=True,
+            stderr=subprocess.DEVNULL,
         ).strip()
-        return version
+        if version:
+            return version
+    except Exception:
+        pass
+
+    return "dev"
+
+
+def check_new_version():
+    """检查Gitee是否有新版本"""
+    import urllib.request
+    import re
+
+    try:
+        req = urllib.request.Request(
+            GITEE_RELEASES_URL,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            html = response.read().decode("utf-8")
+
+        # 提取最新版本的标签名 (格式: <a href="/lzy-buaa-jdi/ameath/releases/tag/v1.1.1">v1.1.1</a>)
+        pattern = r'href="/lzy-buaa-jdi/ameath/releases/tag/(v[^"]+)"'
+        matches = re.findall(pattern, html)
+        if matches:
+            return matches[0]
+    except Exception as e:
+        print(f"检查版本失败: {e}")
+    return None
+
+
+def normalize_version(v):
+    """标准化版本号用于比较"""
+    v = v.lstrip("v")
+    parts = v.split(".")
+    if v == "dev" or not v:
+        return []
+    try:
+        return [int(p) for p in parts if p.isdigit()]
     except:
-        return "dev"
+        return []
+
+
+def version_greater_than(v1, v2):
+    """比较两个版本号，v1 > v2 返回 True"""
+    parts1 = normalize_version(v1)
+    parts2 = normalize_version(v2)
+    if not parts1 or not parts2:
+        return False
+    max_len = max(len(parts1), len(parts2))
+    parts1 = parts1 + [0] * (max_len - len(parts1))
+    parts2 = parts2 + [0] * (max_len - len(parts2))
+    return parts1 > parts2
 
 
 # ============ 配置 ============
@@ -62,6 +129,7 @@ DEFAULT_TRANSPARENCY_INDEX = 0  # 默认不透明
 VERSION = get_version()
 AUTHOR_BILIBILI = "-fugu-"
 AUTHOR_EMAIL = "1977184420@qq.com"
+GITEE_RELEASES_URL = "https://gitee.com/lzy-buaa-jdi/ameath/releases"
 SPEED_X = 3
 SPEED_Y = 2
 TRANSPARENT_COLOR = "pink"
@@ -120,6 +188,8 @@ GWL_EXSTYLE = -20
 WS_EX_LAYERED = 0x00080000
 WS_EX_TRANSPARENT = 0x00000020
 
+
+STAY_PUT_CHANCE = 0.3  # 停下时原地不动的概率
 
 # ==============================
 
@@ -541,15 +611,24 @@ class DesktopGif:
         # 如果是暂停状态，不处理
         if self.is_paused:
             return
-        self.is_moving = False
-        frames, delays = random.choice(self.idle_gifs)
-        self.current_frames = frames
-        self.current_delays = delays
-        self.frame_index = 0
 
-        # 随机停止一段时间后恢复移动
-        stop_duration = random.randint(STOP_DURATION_MIN, STOP_DURATION_MAX)
-        self.root.after(stop_duration, self.switch_to_move)
+        # 有一定概率直接停在原地，不播放动画
+        if random.random() < STAY_PUT_CHANCE:
+            # 停在原地：关闭移动，但不播放 idle 动画
+            self.is_moving = False
+            # 停止一段时间后恢复移动
+            stop_duration = random.randint(STOP_DURATION_MIN, STOP_DURATION_MAX)
+            self.root.after(stop_duration, self.switch_to_move)
+        else:
+            # 播放 idle 动画
+            self.is_moving = False
+            frames, delays = random.choice(self.idle_gifs)
+            self.current_frames = frames
+            self.current_delays = delays
+            self.frame_index = 0
+            # 随机停止一段时间后恢复移动
+            stop_duration = random.randint(STOP_DURATION_MIN, STOP_DURATION_MAX)
+            self.root.after(stop_duration, self.switch_to_move)
 
     def switch_to_move(self):
         """切换到移动状态"""
@@ -840,9 +919,104 @@ class DesktopGif:
 
 
 if __name__ == "__main__":
+    import webbrowser
+    import threading
+
+    def show_update_dialog(parent, latest_version):
+        """显示版本更新通知弹窗"""
+        dialog = tk.Toplevel(parent)
+        dialog.title("发现新版本")
+        width, height = 520, 300
+        dialog.geometry(f"{width}x{height}")
+        dialog.resizable(False, False)
+        dialog.attributes("-topmost", True)
+        dialog.transient(parent)
+        try:
+            dialog.iconbitmap(resource_path("gifs/ameath.ico"))
+        except Exception as e:
+            print(f"设置更新窗口图标失败: {e}")
+
+        # 居中显示
+        dialog.update_idletasks()
+        screen_w = dialog.winfo_screenwidth()
+        screen_h = dialog.winfo_screenheight()
+        x = (screen_w - width) // 2
+        y = (screen_h - height) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        # 内容
+        tk.Label(
+            dialog,
+            text="发现新版本！",
+            font=("Microsoft YaHei UI", 16, "bold"),
+        ).pack(pady=(25, 15))
+
+        tk.Label(
+            dialog,
+            text=f"当前版本: {VERSION}",
+            font=("Microsoft YaHei UI", 12),
+        ).pack()
+
+        tk.Label(
+            dialog,
+            text=f"最新版本: {latest_version}",
+            font=("Microsoft YaHei UI", 12),
+        ).pack(pady=(5, 20))
+
+        # 按钮
+        btn_frame = tk.Frame(dialog)
+        btn_frame.pack(pady=(0, 25))
+
+        def on_download():
+            webbrowser.open(GITEE_RELEASES_URL)
+            dialog.destroy()
+
+        def on_skip():
+            config = load_config()
+            config["skip_updates"] = True
+            save_config(config)
+            dialog.destroy()
+
+        tk.Button(
+            btn_frame,
+            text="前往发布",
+            command=on_download,
+            width=12,
+            font=("Microsoft YaHei UI", 11),
+            bg="#1890FF",
+            fg="white",
+        ).pack(side=tk.LEFT, padx=15)
+
+        tk.Button(
+            btn_frame,
+            text="不再提醒",
+            command=on_skip,
+            width=12,
+            font=("Microsoft YaHei UI", 11),
+            bg="#999999",
+            fg="white",
+        ).pack(side=tk.LEFT, padx=15)
+
+        dialog.focus_force()
+
+    def check_version_and_notify(root):
+        """检查版本并通知（后台线程调用）"""
+        latest = check_new_version()
+        if latest and version_greater_than(latest, VERSION):
+            config = load_config()
+            if config.get("skip_updates"):
+                return
+            if config.get("skip_version") == latest:
+                return
+            # 在主线程显示弹窗
+            root.after(0, lambda: show_update_dialog(root, latest))
+
     root = tk.Tk()
     # 立即隐藏窗口，避免闪烁
     root.withdraw()
+
+    # 后台检查版本（非阻塞）
+    threading.Thread(target=check_version_and_notify, args=(root,), daemon=True).start()
 
     # 尝试导入pystray
     try:
@@ -970,19 +1144,21 @@ if __name__ == "__main__":
 
         def on_about(icon, item):
             """显示关于信息"""
+            import webbrowser
+
             about_window = tk.Toplevel(app.root)
             about_window.title("飞吧，朝向春天")
-            about_window.geometry("700x480")
+            about_window.geometry("700x550")
             about_window.resizable(False, False)
             about_window.attributes("-topmost", True)
 
-            # 设置窗口图标（与托盘图标一致）
+            # 设置窗口图标
             try:
                 icon_image = PILImage.open(resource_path("gifs/ameath.gif"))
                 icon_image = icon_image.resize((64, 64), Image.Resampling.LANCZOS)
                 icon_pil = icon_image.convert("RGBA")
                 app_icon = ImageTk.PhotoImage(icon_pil)
-                about_window.iconphoto(True, app_icon)  # type: ignore
+                about_window.iconphoto(True, app_icon)
             except:
                 pass
 
@@ -991,48 +1167,88 @@ if __name__ == "__main__":
             screen_w = about_window.winfo_screenwidth()
             screen_h = about_window.winfo_screenheight()
             x = (screen_w - 700) // 2
-            y = (screen_h - 480) // 2
+            y = (screen_h - 550) // 2
             about_window.geometry(f"+{x}+{y}")
 
-            # 使用 Frame 添加内边距
-            padding_frame = tk.Frame(about_window, padx=50, pady=35)
-            padding_frame.pack(fill=tk.BOTH, expand=True)
+            # 主内容 Frame
+            content_frame = tk.Frame(about_window)
+            content_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=20)
 
-            # 内容
+            # 显示 ameath.gif
+            try:
+                gif_image = PILImage.open(resource_path("gifs/ameath.gif"))
+                gif_image = gif_image.resize((100, 100), Image.Resampling.LANCZOS)
+                gif_photo = ImageTk.PhotoImage(gif_image)
+                gif_label = tk.Label(content_frame, image=gif_photo, border=0)
+                gif_label.image = gif_photo
+                gif_label.pack(pady=(0, 15))
+            except Exception as e:
+                print(f"加载关于窗口GIF失败: {e}")
+
+            # 标题
             tk.Label(
-                padding_frame,
+                content_frame,
                 text="飞吧，朝向春天",
-                font=("Microsoft YaHei UI", 26, "bold"),
-            ).pack(pady=(0, 35))
+                font=("Microsoft YaHei UI", 20, "bold"),
+            ).pack(pady=(0, 20))
 
+            # 版本号
             tk.Label(
-                padding_frame,
+                content_frame,
                 text=f"版本: {VERSION}",
-                font=("Microsoft YaHei UI", 16),
-            ).pack()
+                font=("Microsoft YaHei UI", 12),
+            ).pack(pady=(0, 15))
 
-            tk.Label(
-                padding_frame,
-                text=f"作者B站: {AUTHOR_BILIBILI}",
-                font=("Microsoft YaHei UI", 16),
-            ).pack(pady=(25, 0))
+            # Gitee Release 链接
+            def open_gitee():
+                webbrowser.open("https://gitee.com/lzy-buaa-jdi/ameath/releases")
 
+            link1 = tk.Frame(content_frame)
+            link1.pack(pady=(0, 8))
             tk.Label(
-                padding_frame,
-                text=f"邮箱: {AUTHOR_EMAIL}",
-                font=("Microsoft YaHei UI", 16),
-                wraplength=600,  # 自动换行
-                justify=tk.LEFT,
-            ).pack(pady=(25, 0))
+                link1,
+                text="软件发布页: ",
+                font=("Microsoft YaHei UI", 12),
+            ).pack(side=tk.LEFT)
+            link1_text = tk.Label(
+                link1,
+                text="Gitee Release",
+                font=("Microsoft YaHei UI", 12),
+                fg="#1890FF",
+                cursor="hand2",
+            )
+            link1_text.pack(side=tk.LEFT)
+            link1_text.bind("<Button-1>", lambda e: open_gitee())
+
+            # B站链接
+            def open_bili():
+                webbrowser.open("https://space.bilibili.com/84508966")
+
+            link2 = tk.Frame(content_frame)
+            link2.pack(pady=(0, 25))
+            tk.Label(
+                link2,
+                text="作者: ",
+                font=("Microsoft YaHei UI", 12),
+            ).pack(side=tk.LEFT)
+            link2_text = tk.Label(
+                link2,
+                text="b站-fugu-",
+                font=("Microsoft YaHei UI", 12),
+                fg="#1890FF",
+                cursor="hand2",
+            )
+            link2_text.pack(side=tk.LEFT)
+            link2_text.bind("<Button-1>", lambda e: open_bili())
 
             # 关闭按钮
             tk.Button(
-                padding_frame,
+                content_frame,
                 text="确定",
                 command=about_window.destroy,
                 width=12,
-                font=("Microsoft YaHei UI", 14),
-            ).pack(pady=(40, 0))
+                font=("Microsoft YaHei UI", 11),
+            ).pack(pady=(10, 0))
 
         def create_menu(app_instance):
             """动态创建菜单"""
