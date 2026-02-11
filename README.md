@@ -11,7 +11,7 @@
 本项目在原版 [Ameath](https://gitee.com/lzy-buaa-jdi/ameath) 基础上进行二次开发，添加了更多实用功能。
 
 - **原作者**：B站 [@-fugu-
-](https://space.bilibili.com/3546676212836439)
+](https://space.bilibili.com/84508966?spm_id_from=333.788.upinfo.head.click)
 - **原版项目**：https://gitee.com/lzy-buaa-jdi/ameath
 - **介绍视频**：[【我制作了飞行雪绒可爱桌宠！win平台，低占用】](https://www.bilibili.com/video/BV12rcMznEcG)
 
