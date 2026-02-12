@@ -22,6 +22,12 @@ python main.py
 pyinstaller ameath.spec
 ```
 
+### Lint with Ruff
+```bash
+ruff check .
+ruff check --fix .
+```
+
 ### Syntax Check (All Modules)
 ```bash
 python -m py_compile main.py src/*.py
@@ -32,10 +38,6 @@ python -m py_compile main.py src/*.py
 - If a pytest suite is added later, use:
 ```bash
 pytest
-```
-
-### Run a Single Test (If pytest exists)
-```bash
 pytest path/to/test_file.py::test_name
 ```
 

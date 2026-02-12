@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import random
+import time
 import tkinter as tk
 from typing import Any, Optional, Tuple
 
@@ -59,6 +60,7 @@ from src.constants import (
 )
 from src.quick_menu import QuickMenu
 from src.pomodoro_indicator import PomodoroIndicator
+from src.music_panel import MusicPanel
 from src.speech_bubble import SpeechBubble
 from src.startup import check_and_fix_startup, set_auto_startup
 from src.system import get_window_handle, set_click_through, set_window_topmost
@@ -260,8 +262,13 @@ class DesktopPet:
         self._last_frames: Optional[list] = None
         self._last_delays: Optional[list] = None
         self._music_playing = False
+        self._music_paused = False
         self._music_playlist = []
         self._music_index = 0
+        self._music_start_time = 0.0
+        self._music_pause_start = 0.0
+        self._music_paused_total = 0.0
+        self._music_length_cache: dict[str, float] = {}
 
         # 拖动状态
         self.dragging = False
@@ -298,6 +305,7 @@ class DesktopPet:
         self.speech_bubble = SpeechBubble(self)
         self.quick_menu = QuickMenu(self)
         self.pomodoro_indicator = PomodoroIndicator(self)
+        self.music_panel = MusicPanel(self)
         self._last_click_time = 0
         self._click_count = 0
         self._is_showing_greeting = False
@@ -415,7 +423,9 @@ class DesktopPet:
     def _check_routine(self) -> None:
         """检查作息状态（每分钟调用一次）"""
         from datetime import datetime
-        from src.constants import REMINDERS, SLEEP_SPEED_MULTIPLIER, SPEED_X, SPEED_Y
+        from src.constants import REMINDERS, SLEEP_SPEED_MULTIPLIER
+
+        global SPEED_X, SPEED_Y
 
         # 检查时间段变化
         current_period = self._get_time_period()
@@ -427,7 +437,6 @@ class DesktopPet:
             if current_period == "sleep":
                 self._is_sleeping = True
                 # 降低移动速度
-                global SPEED_X, SPEED_Y
                 SPEED_X = int(self._original_speed_x * SLEEP_SPEED_MULTIPLIER)
                 SPEED_Y = int(self._original_speed_y * SLEEP_SPEED_MULTIPLIER)
                 # 显示晚安提示
@@ -676,6 +685,8 @@ class DesktopPet:
                 self.speech_bubble.update_position()
             if hasattr(self, "pomodoro_indicator") and self.pomodoro_indicator:
                 self.pomodoro_indicator.update_position()
+            if hasattr(self, "music_panel") and self.music_panel:
+                self.music_panel.update_position()
 
         self._move_ticks_since_move += 1
         return self._schedule_move(MOVE_INTERVAL)
@@ -1014,6 +1025,8 @@ class DesktopPet:
                 self.speech_bubble.update_position()
             if hasattr(self, "pomodoro_indicator") and self.pomodoro_indicator:
                 self.pomodoro_indicator.update_position()
+            if hasattr(self, "music_panel") and self.music_panel:
+                self.music_panel.update_position()
 
     def _stop_drag(self, event: tk.Event) -> None:
         """停止拖动"""
@@ -1062,6 +1075,20 @@ class DesktopPet:
         if self._drag_started:
             return
 
+        # 音乐模式下，单击切换歌名气泡+控制面板
+        if self._music_playing:
+            if self.music_panel.is_visible():
+                self.music_panel.hide()
+                self.speech_bubble.hide()
+            else:
+                self.music_panel.show()
+                title = self.get_current_music_title()
+                if title:
+                    self.speech_bubble.show(
+                        f"🎵 {title}", duration=None, allow_during_music=True
+                    )
+            return
+
         # 显示点击反应
         self.speech_bubble.show_click_reaction()
 
@@ -1075,6 +1102,8 @@ class DesktopPet:
 
     def show_greeting(self) -> None:
         """显示问候语"""
+        if self._music_playing:
+            return
         if not self._is_showing_greeting:
             self._is_showing_greeting = True
             self.speech_bubble.show_greeting()
@@ -1208,6 +1237,8 @@ class DesktopPet:
 
             if hasattr(self, "tray_controller") and self.tray_controller:
                 self.tray_controller.stop()
+            if hasattr(self, "music_panel") and self.music_panel:
+                self.music_panel.hide()
             self.root.destroy()
             return
         self.root.after(100, self._check_quit)
@@ -1235,9 +1266,117 @@ class DesktopPet:
 
         return True
 
+    def toggle_music_pause(self) -> bool:
+        """切换音乐暂停
+
+        Returns:
+            True 表示暂停中，False 表示正在播放
+        """
+        if not self._music_playing:
+            return False
+
+        if self._music_paused:
+            self._resume_music()
+            return False
+
+        self._pause_music()
+        return True
+
     def is_music_playing(self) -> bool:
         """判断音乐是否正在播放"""
         return self._music_playing
+
+    def is_music_paused(self) -> bool:
+        """判断音乐是否暂停"""
+        return self._music_paused
+
+    def next_music(self) -> None:
+        """切换到下一首"""
+        if not self._music_playlist:
+            return
+        self._music_index = (self._music_index + 1) % len(self._music_playlist)
+        self._start_music(from_seek=False)
+        if self._music_playing and self.speech_bubble.is_visible():
+            title = self.get_current_music_title()
+            if title:
+                self.speech_bubble.show(
+                    f"🎵 {title}", duration=None, allow_during_music=True
+                )
+
+    def prev_music(self) -> None:
+        """切换到上一首"""
+        if not self._music_playlist:
+            return
+        self._music_index = (self._music_index - 1) % len(self._music_playlist)
+        self._start_music(from_seek=False)
+        if self._music_playing and self.speech_bubble.is_visible():
+            title = self.get_current_music_title()
+            if title:
+                self.speech_bubble.show(
+                    f"🎵 {title}", duration=None, allow_during_music=True
+                )
+
+    def get_current_music_path(self) -> str:
+        """获取当前音乐路径"""
+        if not self._music_playlist:
+            return ""
+        return self._music_playlist[self._music_index]
+
+    def get_current_music_title(self) -> str:
+        """获取当前音乐标题（取文件名 '-' 前）"""
+        path = self.get_current_music_path()
+        if not path:
+            return ""
+        from pathlib import Path
+
+        name = Path(path).stem
+        if "-" in name:
+            title = name.split("-", 1)[0].strip()
+            return title or name
+        return name
+
+    def get_music_position(self) -> float:
+        """获取当前音乐播放位置（秒）"""
+        if not self._music_playing:
+            return 0.0
+
+        if self._music_paused:
+            pos = (
+                self._music_pause_start
+                - self._music_start_time
+                - self._music_paused_total
+            )
+            return max(0.0, pos)
+
+        now = time.monotonic()
+        pos = now - self._music_start_time - self._music_paused_total
+        return max(0.0, pos)
+
+    def get_music_length(self) -> float:
+        """获取当前音乐总时长（秒）"""
+        path = self.get_current_music_path()
+        if not path:
+            return 0.0
+        if path in self._music_length_cache:
+            return self._music_length_cache[path]
+        try:
+            sound = pygame.mixer.Sound(path)
+            length = float(sound.get_length())
+            self._music_length_cache[path] = length
+            return length
+        except pygame.error:
+            return 0.0
+
+    def seek_music(self, seconds: float) -> None:
+        """跳转到指定位置（秒）"""
+        if not self._music_playlist:
+            return
+        if seconds < 0:
+            seconds = 0.0
+        length = self.get_music_length()
+        if length > 0:
+            seconds = min(seconds, length - 0.1)
+        self._start_music(from_seek=True, start_pos=seconds)
 
     def _load_music_playlist(self) -> list:
         """加载音乐播放列表（按文件名排序）"""
@@ -1256,7 +1395,7 @@ class DesktopPet:
         except pygame.error as e:
             print(f"初始化音乐模块失败: {e}")
 
-    def _start_music(self) -> bool:
+    def _start_music(self, from_seek: bool = False, start_pos: float = 0.0) -> bool:
         """开始音乐播放"""
         if not pygame.mixer.get_init():
             self._init_music_backend()
@@ -1264,17 +1403,35 @@ class DesktopPet:
             return False
         try:
             pygame.mixer.music.load(self._music_playlist[self._music_index])
-            pygame.mixer.music.play()
+            if start_pos > 0:
+                pygame.mixer.music.play(start=start_pos)
+            else:
+                pygame.mixer.music.play()
         except pygame.error as e:
             print(f"音乐播放失败: {e}")
-            return False
+            if start_pos > 0:
+                try:
+                    pygame.mixer.music.play()
+                except pygame.error as retry_error:
+                    print(f"音乐跳转失败: {retry_error}")
+                    return False
+                start_pos = 0.0
+            else:
+                return False
 
         self._last_frames = None
         self._last_delays = None
         self._music_playing = True
+        self._music_paused = False
+        self._music_start_time = time.monotonic() - start_pos
+        self._music_pause_start = 0.0
+        self._music_paused_total = 0.0
         self._ensure_music_frames()
         self._switch_to_music_animation()
-        self._check_music_end()
+        if not from_seek:
+            self._check_music_end()
+        else:
+            self._check_music_end()
         return True
 
     def _check_music_end(self) -> None:
@@ -1282,11 +1439,18 @@ class DesktopPet:
         if not self._music_playing:
             return
 
+        if self._music_paused:
+            self.root.after(500, self._check_music_end)
+            return
+
         if not pygame.mixer.music.get_busy():
             if self._music_playlist:
                 self._music_index = (self._music_index + 1) % len(self._music_playlist)
                 pygame.mixer.music.load(self._music_playlist[self._music_index])
                 pygame.mixer.music.play()
+                self._music_start_time = time.monotonic()
+                self._music_pause_start = 0.0
+                self._music_paused_total = 0.0
 
         self.root.after(500, self._check_music_end)
 
@@ -1301,7 +1465,39 @@ class DesktopPet:
             print(f"停止音乐失败: {e}")
 
         self._music_playing = False
+        self._music_paused = False
+        self._music_start_time = 0.0
+        self._music_pause_start = 0.0
+        self._music_paused_total = 0.0
         self._restore_animation_after_music()
+        if hasattr(self, "music_panel") and self.music_panel:
+            self.music_panel.hide()
+
+    def _pause_music(self) -> None:
+        """暂停音乐"""
+        if not self._music_playing or self._music_paused:
+            return
+        try:
+            pygame.mixer.music.pause()
+        except pygame.error as e:
+            print(f"暂停音乐失败: {e}")
+            return
+        self._music_paused = True
+        self._music_pause_start = time.monotonic()
+
+    def _resume_music(self) -> None:
+        """恢复音乐"""
+        if not self._music_playing or not self._music_paused:
+            return
+        try:
+            pygame.mixer.music.unpause()
+        except pygame.error as e:
+            print(f"恢复音乐失败: {e}")
+            return
+        pause_duration = time.monotonic() - self._music_pause_start
+        self._music_paused_total += max(0.0, pause_duration)
+        self._music_pause_start = 0.0
+        self._music_paused = False
 
     def _switch_to_music_animation(self) -> None:
         """切换到音乐动画"""

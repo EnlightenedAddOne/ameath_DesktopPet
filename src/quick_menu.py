@@ -366,7 +366,7 @@ class QuickMenu:
         items: list[tuple[str | tk.StringVar, Callable[[], None]]] = [
             ("👻 穿透", self._toggle_click_through),
             ("🍅 开始/停", self._toggle_pomodoro),
-            ("🔁 重置", self._reset_pomodoro),
+            ("🍅 重置", self._reset_pomodoro),
             (self._music_text, self._toggle_music),
             ("👁️ 隐藏", self._hide_pet),
             ("❌ 退出", self._quit),

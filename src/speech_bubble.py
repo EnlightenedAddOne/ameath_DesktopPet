@@ -96,9 +96,10 @@ class SpeechBubble:
     def show(
         self,
         text: str | None = None,
-        duration: int = 3000,
+        duration: int | None = 3000,
         x: int | None = None,
         y: int | None = None,
+        allow_during_music: bool = False,
     ) -> None:
         """显示对话气泡
 
@@ -108,6 +109,9 @@ class SpeechBubble:
             x: X坐标，None则自动计算
             y: Y坐标，None则自动计算
         """
+        if getattr(self.app, "_music_playing", False) and not allow_during_music:
+            return
+
         # 如果已有气泡，先关闭
         self.hide()
 
@@ -216,6 +220,8 @@ class SpeechBubble:
         self.window.geometry(f"{width}x{height}+{x_pos}+{y_pos}")
 
         # 自动关闭
+        if duration is None or duration <= 0:
+            return
         self.after_id = self.app.root.after(duration, self.hide)
 
     def update_position(self) -> None:
@@ -326,6 +332,12 @@ class SpeechBubble:
             self.window.destroy()
             self.window = None
             self.label = None
+
+    def is_visible(self) -> bool:
+        """判断气泡是否可见"""
+        if not self.window or not self.window.winfo_exists():
+            return False
+        return str(self.window.state()) != "withdrawn"
 
     def _wrap_text(self, text: str, font: tkfont.Font, max_width: int) -> List[str]:
         """按宽度换行文本"""
