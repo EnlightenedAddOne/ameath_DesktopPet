@@ -23,7 +23,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='ameath',
+    name='Aemeath',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

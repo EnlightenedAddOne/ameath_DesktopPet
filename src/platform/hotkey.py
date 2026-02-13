@@ -7,7 +7,7 @@ from ctypes import wintypes
 from typing import Callable, Dict, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.pet import DesktopPet
+    from src.core.pet_core import DesktopPet
 
 
 # Windows API 常量

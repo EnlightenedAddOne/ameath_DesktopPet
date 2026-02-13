@@ -17,7 +17,7 @@ from src.constants import (
 from src.utils import resource_path
 
 if TYPE_CHECKING:
-    from src.pet import DesktopPet
+    from src.core.pet_core import DesktopPet
 
 
 class TrayController:

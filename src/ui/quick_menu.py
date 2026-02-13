@@ -6,7 +6,7 @@ import tkinter as tk
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    from src.pet import DesktopPet
+    from src.core.pet_core import DesktopPet
 
 from src.constants import (
     BEHAVIOR_MODE_ACTIVE,
@@ -373,14 +373,16 @@ class QuickMenu:
         ]
 
         columns = 2
+        last_btn: tk.Button | None = None
         for index, (text, command) in enumerate(items):
             row = index // columns
             column = index % columns
             btn = self._create_button_widget(group, text, command)
             btn.grid(row=row, column=column, sticky="ew", padx=4, pady=1)
+            last_btn = btn
 
-        if len(items) % columns == 1:
-            btn.grid(columnspan=2)
+        if len(items) % columns == 1 and last_btn is not None:
+            last_btn.grid(columnspan=2)
 
         group.columnconfigure(0, weight=1)
         group.columnconfigure(1, weight=1)

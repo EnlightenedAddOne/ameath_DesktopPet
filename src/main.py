@@ -6,14 +6,14 @@
 import tkinter as tk
 
 # 必须先启用 DPI 感知
-from src.system import enable_dpi_awareness
+from src.platform.system import enable_dpi_awareness
 
 enable_dpi_awareness()
 
 from src.config import load_config
-from src.hotkey import hotkey_manager
-from src.pet import DesktopPet
-from src.tray import TrayController
+from src.platform.hotkey import hotkey_manager
+from src.core.pet_core import DesktopPet
+from src.platform.tray import TrayController
 
 
 def main():

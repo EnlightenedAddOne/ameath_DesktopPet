@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    from src.pet import DesktopPet
+    from src.core.pet_core import DesktopPet
 
 from src.constants import TRANSPARENT_COLOR
 
