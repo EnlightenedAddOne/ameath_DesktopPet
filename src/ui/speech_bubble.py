@@ -14,67 +14,6 @@ if TYPE_CHECKING:
 from src.constants import TRANSPARENT_COLOR
 
 
-# 不同时间段的问候语
-GREETINGS = {
-    "morning": [
-        "早上好呀！☀️",
-        "新的一天开始啦~",
-        "早安！要元气满满哦！",
-        "早上好！记得吃早餐哦~",
-        "又是美好的一天！",
-    ],
-    "noon": [
-        "中午好！",
-        "该吃午饭啦~",
-        "午后时光，休息一下吧",
-        "中午好！要不要小憩一下？",
-    ],
-    "afternoon": [
-        "下午好！",
-        "工作/学习辛苦啦~",
-        "下午茶时间到了吗？",
-        "加油！马上就下班/放学了！",
-    ],
-    "evening": [
-        "晚上好！🌙",
-        "今天过得怎么样？",
-        "晚上是放松的时间~",
-        "辛苦了一天，好好休息吧~",
-    ],
-    "night": [
-        "夜深了，还不睡吗？😴",
-        "熬夜对身体不好哦~",
-        "晚安，做个好梦~",
-        "该睡觉啦，明天见~",
-    ],
-}
-
-# 随机互动台词
-RANDOM_LINES = [
-    "我在这里陪着你哦~ 💕",
-    "有什么我可以帮你的吗？",
-    "无聊的话可以找我玩呀~",
-    "你今天看起来很不错呢！",
-    "要劳逸结合哦~",
-    "记得多喝水！💧",
-    "长时间看屏幕对眼睛不好哦~",
-    "适当活动一下身体吧~",
-    "我在发呆... (￣▽￣)",
-    "要不要休息一下？",
-]
-
-# 点击反应台词
-CLICK_REACTIONS = [
-    "哎呀，被发现了！😆",
-    "别戳我啦~",
-    "哈哈，好痒！",
-    "嘿嘿，抓到我了！",
-    "唔...怎么啦？",
-    "我在呢！👋",
-    "你找到我啦！",
-]
-
-
 class SpeechBubble:
     """对话气泡类 - 美化版"""
 
@@ -367,51 +306,17 @@ class SpeechBubble:
         return lines
 
     def _get_random_text(self) -> str:
-        """获取随机问候语"""
+        """获取随机问候语 - 统一使用aemeath人设"""
         hour = datetime.now().hour
+        from src.ai.emys_character import get_random_greeting
 
-        # 检查是否使用爱弥斯人设
-        if (
-            hasattr(self.app, "ai_chat")
-            and self.app.ai_chat
-            and getattr(self.app.ai_chat, "current_personality", "") == "emys"
-        ):
-            # 使用爱弥斯的问候语
-            from src.ai.emys_character import get_random_greeting
-
-            return get_random_greeting(hour)
-
-        # 根据时间选择问候语
-        if 5 <= hour < 11:
-            time_key = "morning"
-        elif 11 <= hour < 14:
-            time_key = "noon"
-        elif 14 <= hour < 18:
-            time_key = "afternoon"
-        elif 18 <= hour < 22:
-            time_key = "evening"
-        else:
-            time_key = "night"
-
-        # 70%概率使用时间相关问候，30%概率使用随机台词
-        if random.random() < 0.7:
-            return random.choice(GREETINGS[time_key])
-        else:
-            return random.choice(RANDOM_LINES)
+        return get_random_greeting(hour)
 
     def show_click_reaction(self) -> None:
-        """显示点击反应"""
-        # 检查是否使用爱弥斯人设
-        if (
-            hasattr(self.app, "ai_chat")
-            and self.app.ai_chat
-            and getattr(self.app.ai_chat, "current_personality", "") == "emys"
-        ):
-            from src.ai.emys_character import EMYS_RESPONSES
+        """显示点击反应 - 统一使用aemeath人设"""
+        from src.ai.emys_character import EMYS_RESPONSES
 
-            text = random.choice(EMYS_RESPONSES["click_reaction"])
-        else:
-            text = random.choice(CLICK_REACTIONS)
+        text = random.choice(EMYS_RESPONSES["click_reaction"])
         self.show(text, duration=2000)
 
     def show_greeting(self) -> None:

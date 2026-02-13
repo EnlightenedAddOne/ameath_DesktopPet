@@ -29,7 +29,7 @@ def _default_config() -> Dict[str, Any]:
         "ai_api_key": "",
         "ai_model": AI_DEFAULT_MODELS[AI_PROVIDER_DEEPSEEK],
         "ai_base_url": "",
-        "ai_personality": "emys",
+        "ai_personality": "aemeath",
     }
 
 

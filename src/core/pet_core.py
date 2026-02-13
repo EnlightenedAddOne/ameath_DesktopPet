@@ -399,7 +399,7 @@ class DesktopPet:
         if (
             hasattr(self, "ai_chat")
             and self.ai_chat
-            and getattr(self.ai_chat, "current_personality", "") == "emys"
+            and getattr(self.ai_chat, "current_personality", "") == "aemeath"
         ):
             title = "和爱弥斯聊天"
             prompt = "想和爱弥斯说点什么？"
@@ -491,7 +491,7 @@ class DesktopPet:
             question = quick_manager.get_random_question()
 
         # 如果是爱弥斯人设，检查是否有本地预设回复
-        if self.ai_chat.current_personality == "emys":
+        if self.ai_chat.current_personality == "aemeath":
             from src.ai.emys_character import get_quick_reply
 
             quick_reply = get_quick_reply(question)
@@ -549,8 +549,18 @@ class DesktopPet:
     def close_ai_chat_panel(self) -> None:
         """关闭AI聊天面板"""
         if self.ai_chat_panel:
+            # 触发告别语
+            import random
+            from src.ai.emys_character import EMYS_RESPONSES
+
+            farewell_text = random.choice(EMYS_RESPONSES["farewell"])
+            self.speech_bubble.show(farewell_text, duration=3000)
+
             self.ai_chat_panel.close()
             self.ai_chat_panel = None
+        else:
+            # 关闭气泡
+            self.speech_bubble.hide()
 
     def is_ai_chat_panel_visible(self) -> bool:
         """检查AI聊天面板是否可见"""

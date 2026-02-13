@@ -80,6 +80,8 @@ class ClickHandler:
                 self._click_animation_after_id = app.root.after(
                     2000, self._restore_idle_animation
                 )
+            # 安静模式下也触发点击反应气泡
+            app.speech_bubble.show_click_reaction()
             return
 
         if app._music_playing:

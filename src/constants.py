@@ -98,18 +98,35 @@ SLEEP_STOP_CHANCE = 0.01  # 睡觉时停下概率
 NIGHT_IDLE_CHANCE = 0.7  # 夜晚待机概率
 
 # ============ 提醒功能配置 ============
+REMINDER_CHANCE = 0.3  # 触发概率降低为30%
+
 REMINDERS = {
     "water": {
-        "interval": 30,  # 分钟
-        "messages": ["记得喝水哦~", "补充水分很重要！", "该喝水啦~"],
+        "interval": 60,  # 分钟
+        "messages": [
+            "记得喝水哦~ 身体是革命的本钱嘛！💧",
+            "补充水分很重要！要不要一起喝水呀？",
+            "该喝水啦~ 我也在补充能量呢！",
+            "水是生命之源哦，快去喝水吧！",
+        ],
     },
     "rest": {
-        "interval": 45,  # 分钟
-        "messages": ["休息一下吧~", "眼睛需要休息哦~", "起来活动活动~"],
+        "interval": 90,  # 分钟
+        "messages": [
+            "休息一下吧~ 眼睛也需要放假呢",
+            "眼睛需要休息哦~ 看看远处放松一下吧",
+            "起来活动活动嘛，一直坐着对身体不好呢",
+            "适当休息才能更有效率哦，要劳逸结合！",
+        ],
     },
     "posture": {
-        "interval": 60,  # 分钟
-        "messages": ["注意坐姿哦~", "挺直腰板~", "不要驼背哦~"],
+        "interval": 120,  # 分钟
+        "messages": [
+            "注意坐姿哦~ 挺直腰板的样子最帅了！",
+            "不要驼背啦~ 良好的体态很重要呢",
+            "调整一下坐姿吧，我会一直陪着你的",
+            "时刻保持优雅！坐姿也要美美哒~",
+        ],
     },
 }
 
@@ -121,12 +138,87 @@ GITEE_RELEASES_URL = "https://gitee.com/lzy-buaa-jdi/ameath/releases"
 # ============ AI配置 ============
 AI_PROVIDER_DEEPSEEK = "deepseek"
 AI_PROVIDER_OPENAI = "openai"
-AI_PROVIDER_CLAUDE = "claude"
+AI_PROVIDER_QWEN = "qwen"
+AI_PROVIDER_GLM = "glm"
+AI_PROVIDER_KIMI = "kimi"
+AI_PROVIDER_DOUBAO = "doubao"
+AI_PROVIDER_CUSTOM = "custom"
+
+AI_PROVIDERS = [
+    AI_PROVIDER_DEEPSEEK,
+    AI_PROVIDER_OPENAI,
+    AI_PROVIDER_QWEN,
+    AI_PROVIDER_GLM,
+    AI_PROVIDER_KIMI,
+    AI_PROVIDER_DOUBAO,
+    AI_PROVIDER_CUSTOM,
+]
+
+AI_PROVIDER_NAMES = {
+    AI_PROVIDER_DEEPSEEK: "DeepSeek",
+    AI_PROVIDER_OPENAI: "OpenAI",
+    AI_PROVIDER_QWEN: "千问 (Qwen)",
+    AI_PROVIDER_GLM: "智谱GLM",
+    AI_PROVIDER_KIMI: "Kimi",
+    AI_PROVIDER_DOUBAO: "豆包 (Doubao)",
+    AI_PROVIDER_CUSTOM: "自定义第三方API",
+}
 
 AI_DEFAULT_MODELS = {
     AI_PROVIDER_DEEPSEEK: "deepseek-chat",
     AI_PROVIDER_OPENAI: "gpt-3.5-turbo",
-    AI_PROVIDER_CLAUDE: "claude-3-haiku-20240307",
+    AI_PROVIDER_QWEN: "qwen-plus",
+    AI_PROVIDER_GLM: "glm-4-flash",
+    AI_PROVIDER_KIMI: "moonshot/kimi-k2-0711-preview",
+    AI_PROVIDER_DOUBAO: "doubao-1.5-pro-32k",
+}
+
+AI_MODELS = {
+    AI_PROVIDER_DEEPSEEK: [
+        "deepseek-chat",
+        "deepseek-reasoner",
+    ],
+    AI_PROVIDER_OPENAI: [
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4-turbo",
+        "gpt-3.5-turbo",
+    ],
+    AI_PROVIDER_QWEN: [
+        "qwen-plus",
+        "qwen-max",
+        "qwen-turbo",
+        "qwen-long",
+        "qwen-coder-plus",
+        "qwen-coder-turbo",
+    ],
+    AI_PROVIDER_GLM: [
+        "glm-4",
+        "glm-4-flash",
+        "glm-4-plus",
+        "glm-4-air",
+        "glm-4-flashx",
+    ],
+    AI_PROVIDER_KIMI: [
+        "moonshot/kimi-k2-0711-preview",
+        "moonshot/kimi-k2-turbo-preview",
+        "moonshot/kimi-k2.5-preview",
+    ],
+    AI_PROVIDER_DOUBAO: [
+        "doubao-1.5-pro-32k",
+        "doubao-1.5-pro-256k",
+        "doubao-1.5-lite-32k",
+        "doubao-pro-32k",
+    ],
+}
+
+AI_DEFAULT_BASE_URLS = {
+    AI_PROVIDER_DEEPSEEK: "https://api.deepseek.com/v1",
+    AI_PROVIDER_OPENAI: "https://api.openai.com/v1",
+    AI_PROVIDER_QWEN: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    AI_PROVIDER_GLM: "https://open.bigmodel.cn/api/paas/v4",
+    AI_PROVIDER_KIMI: "https://api.moonshot.ai/v1",
+    AI_PROVIDER_DOUBAO: "https://ark.cn-beijing.volces.com/api/v3",
 }
 
 # AI快捷键

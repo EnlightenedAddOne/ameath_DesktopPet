@@ -15,9 +15,13 @@ import requests
 
 from src.config import load_config
 from src.constants import (
-    AI_PROVIDER_CLAUDE,
-    AI_PROVIDER_DEEPSEEK,
+    AI_DEFAULT_BASE_URLS,
+    AI_PROVIDER_DOUBAO,
+    AI_PROVIDER_GLM,
+    AI_PROVIDER_KIMI,
     AI_PROVIDER_OPENAI,
+    AI_PROVIDER_QWEN,
+    AI_PROVIDER_DEEPSEEK,
 )
 from src.ai.emys_character import (
     get_emys_personality,
@@ -71,7 +75,7 @@ class AIChatEngine:
 
     # 预设角色设定
     PERSONALITIES = {
-        "emys": "爱弥斯（Emys）- 飞行雪绒",  # 鸣潮角色人设
+        "aemeath": "爱弥斯（Aemeath）- 桌面宠物",  # 桌面宠物人设
         "default": "阿米 - 默认可爱助手",
         "helpful": "专业助手模式",
         "cute": "超萌模式",
@@ -80,22 +84,22 @@ class AIChatEngine:
 
     def _get_system_prompt(self) -> str:
         """获取系统提示词"""
-        if self.current_personality == "emys":
+        if self.current_personality == "aemeath":
             return get_emys_personality()
         elif self.current_personality == "helpful":
-            return "你是一个有帮助的桌面助手，名叫阿米。你专业、准确，会给出实用的建议。回答简洁明了。"
+            return "你是一个有帮助的桌面助手，名叫小爱。你专业、准确，会给出实用的建议。回答简洁明了。"
         elif self.current_personality == "cute":
-            return "你是一个超级可爱的桌面宠物，名叫阿米。你说话带着萌系语气，喜欢用颜文字和emoji。回答简短可爱。"
+            return "你是一个超级可爱的桌面宠物，名叫小爱。你说话带着萌系语气，喜欢用颜文字和emoji。回答简短可爱。"
         elif self.current_personality == "tsundere":
-            return "你是一个傲娇的桌面宠物，名叫阿米。你表面冷淡但内心关心用户，说话带点傲娇语气。"
+            return "你是一个傲娇的桌面宠物，名叫小爱。你表面冷淡但内心关心用户，说话带点傲娇语气。"
         else:
-            return "你是一个可爱的桌面宠物助手，名叫阿米。你性格活泼、友善，喜欢和用户聊天。回答要简短（50字以内），带点可爱语气。"
+            return "你是一个可爱的桌面宠物助手，名叫小爱。你性格活泼、友善，喜欢和用户聊天。回答要简短（50字以内），带点可爱语气。"
 
     def __init__(self, app: DesktopPet):
         self.app = app
         self.history = ChatHistory(max_messages=20)
         self.is_processing = False
-        self.current_personality = "emys"  # 默认使用爱弥斯人设
+        self.current_personality = "aemeath"  # 默认使用爱弥斯人设
         self._load_config()
 
     def _load_config(self) -> None:
@@ -106,19 +110,14 @@ class AIChatEngine:
         self.model = config.get("ai_model", "deepseek-chat")
         self.base_url = config.get("ai_base_url", "")
         self.enabled = config.get("ai_enabled", False)
-        self.personality = config.get("ai_personality", "emys")
+        self.personality = config.get("ai_personality", "aemeath")
         self.current_personality = (
-            self.personality if self.personality in self.PERSONALITIES else "emys"
+            self.personality if self.personality in self.PERSONALITIES else "aemeath"
         )
 
         # 设置默认base_url
         if not self.base_url:
-            if self.provider == AI_PROVIDER_OPENAI:
-                self.base_url = "https://api.openai.com/v1"
-            elif self.provider == AI_PROVIDER_CLAUDE:
-                self.base_url = "https://api.anthropic.com/v1"
-            elif self.provider == AI_PROVIDER_DEEPSEEK:
-                self.base_url = "https://api.deepseek.com/v1"
+            self.base_url = AI_DEFAULT_BASE_URLS.get(self.provider, "")
 
     def is_configured(self) -> bool:
         """检查是否已配置"""
@@ -267,7 +266,7 @@ class QuickChatManager:
     def __init__(self, chat_engine: AIChatEngine):
         self.chat_engine = chat_engine
         # 根据当前人设选择问题列表
-        if chat_engine.current_personality == "emys":
+        if chat_engine.current_personality == "aemeath":
             self.questions = EMYS_QUICK_QUESTIONS.copy()
         else:
             self.questions = QUICK_QUESTIONS.copy()
@@ -286,6 +285,6 @@ class QuickChatManager:
         """获取爱弥斯的快捷回复（本地预设，不调用API）"""
         from src.ai.emys_character import get_quick_reply
 
-        if self.chat_engine.current_personality == "emys":
+        if self.chat_engine.current_personality == "aemeath":
             return get_quick_reply(question)
         return ""
