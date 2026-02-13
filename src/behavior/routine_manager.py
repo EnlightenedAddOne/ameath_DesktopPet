@@ -75,20 +75,21 @@ class RoutineManager:
                 self.app._speed_y = self.app._original_speed_y
                 self.app.speech_bubble.show("早上好！新的一天开始啦~", duration=5000)
 
-        if not self.app._is_sleeping and not self.app.is_paused:
-            current_time = datetime.now()
-            for reminder_type, config in REMINDERS.items():
-                last_time = self.app._last_reminder_time.get(reminder_type)
-                if (
-                    last_time is None
-                    or (current_time - last_time).total_seconds() / 60
-                    >= config["interval"]
-                ):
-                    import random
-
-                    message = random.choice(config["messages"])
-                    self.app.speech_bubble.show(message, duration=5000)
-                    self.app._last_reminder_time[reminder_type] = current_time
-                    break
+        # 暂时禁用定期问候语（可以通过配置控制）
+        # if not self.app._is_sleeping and not self.app.is_paused:
+        #     current_time = datetime.now()
+        #     for reminder_type, config in REMINDERS.items():
+        #         last_time = self.app._last_reminder_time.get(reminder_type)
+        #         if (
+        #             last_time is None
+        #             or (current_time - last_time).total_seconds() / 60
+        #             >= config["interval"]
+        #         ):
+        #             import random
+        #
+        #             message = random.choice(config["messages"])
+        #             self.app.speech_bubble.show(message, duration=5000)
+        #             self.app._last_reminder_time[reminder_type] = current_time
+        #             break
 
         self.app._routine_after_id = self.app.root.after(60000, self.tick)

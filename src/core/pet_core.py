@@ -28,6 +28,8 @@ from src.core.window_manager import WindowManager
 from src.interaction.click_handler import ClickHandler
 from src.interaction.drag_handler import DragHandler
 from src.media.music_controller import MusicController
+from src.ai import AIChatEngine, AIConfigDialog
+from src.ui.ai_chat_panel import AIChatPanel
 
 
 class DesktopPet:
@@ -56,6 +58,12 @@ class DesktopPet:
         self.pomodoro = PomodoroManager(self)
         self.routine = RoutineManager(self)
         self.motion = MotionController(self)
+
+        # AI对话引擎
+        self.ai_chat = AIChatEngine(self)
+
+        # AI聊天面板
+        self.ai_chat_panel: AIChatPanel | None = None
 
         # 初始化窗口
         self.window.init_window()
@@ -268,6 +276,9 @@ class DesktopPet:
 
             hotkey_manager.unregister_all()
 
+            # 关闭AI聊天面板
+            self.close_ai_chat_panel()
+
             if hasattr(self, "tray_controller") and self.tray_controller:
                 self.tray_controller.stop()
             if hasattr(self, "music_panel") and self.music_panel:
@@ -362,3 +373,185 @@ class DesktopPet:
         self.music.seek(seconds)
 
     # 音乐播放逻辑已迁移至 src/media/music_controller.py
+
+    # ============ AI对话功能 ============
+
+    def open_ai_chat_dialog(self) -> None:
+        """打开AI聊天输入对话框"""
+        if not hasattr(self, "ai_chat") or not self.ai_chat:
+            self.speech_bubble.show("AI功能初始化失败，请重启程序~", duration=3000)
+            return
+
+        if not self.ai_chat.is_configured():
+            # 未配置，显示提示并提供配置入口
+            self.show_ai_config_dialog()
+            return
+
+        # 创建输入对话框
+        self._show_chat_input_dialog()
+
+    def _show_chat_input_dialog(self) -> None:
+        """显示聊天输入对话框"""
+        import tkinter as tk
+        from tkinter import ttk
+
+        # 根据人设选择标题和提示
+        if (
+            hasattr(self, "ai_chat")
+            and self.ai_chat
+            and getattr(self.ai_chat, "current_personality", "") == "emys"
+        ):
+            title = "和爱弥斯聊天"
+            prompt = "想和爱弥斯说点什么？"
+        else:
+            title = "和阿米聊天"
+            prompt = "想和阿米说点什么？"
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title(title)
+        dialog.geometry("350x150")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # 居中
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() - 350) // 2
+        y = (dialog.winfo_screenheight() - 150) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        # 提示文字
+        ttk.Label(
+            dialog,
+            text=prompt,
+            font=("Microsoft YaHei", 11, "bold"),
+        ).pack(pady=(15, 10))
+
+        # 输入框
+        input_var = tk.StringVar()
+        entry = ttk.Entry(dialog, textvariable=input_var, font=("Microsoft YaHei", 10))
+        entry.pack(fill=tk.X, padx=20, pady=5)
+        entry.focus()
+
+        def on_send():
+            message = input_var.get().strip()
+            if message:
+                dialog.destroy()
+                self._send_ai_message(message)
+
+        def on_cancel():
+            dialog.destroy()
+
+        # 按钮
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(pady=15)
+
+        ttk.Button(btn_frame, text="发送", command=on_send).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="取消", command=on_cancel).pack(side=tk.LEFT, padx=5)
+
+        # 回车发送
+        entry.bind("<Return>", lambda e: on_send())
+        # ESC取消
+        entry.bind("<Escape>", lambda e: on_cancel())
+
+    def _send_ai_message(self, message: str) -> None:
+        """发送消息给AI"""
+        # 显示思考中
+        self.speech_bubble.show_thinking()
+
+        def on_response(response: str):
+            """收到回复"""
+            self.speech_bubble.show_typing_response(response, speed=40)
+
+        def on_error(error_msg: str):
+            """处理错误"""
+            self.speech_bubble.show(error_msg, duration=4000)
+
+        self.ai_chat.send_message(message, on_response, on_error)
+
+    def quick_ai_chat(self, question: str | None = None) -> None:
+        """快捷AI聊天
+
+        Args:
+            question: 预设问题，None则使用随机问题
+        """
+        if not hasattr(self, "ai_chat") or not self.ai_chat:
+            self.speech_bubble.show("AI功能初始化失败~", duration=3000)
+            return
+
+        if not self.ai_chat.is_configured():
+            self.speech_bubble.show("AI功能未配置，请先设置API密钥哦~", duration=4000)
+            return
+
+        if question is None:
+            # 使用随机快捷问题
+            from src.ai.chat_engine import QuickChatManager
+
+            quick_manager = QuickChatManager(self.ai_chat)
+            question = quick_manager.get_random_question()
+
+        # 如果是爱弥斯人设，检查是否有本地预设回复
+        if self.ai_chat.current_personality == "emys":
+            from src.ai.emys_character import get_quick_reply
+
+            quick_reply = get_quick_reply(question)
+            if quick_reply:
+                # 使用打字机效果显示预设回复
+                self.speech_bubble.show_typing_response(quick_reply, speed=40)
+                return
+
+        self._send_ai_message(question)
+
+    def show_ai_config_dialog(self) -> None:
+        """显示AI配置对话框"""
+        config_dialog = AIConfigDialog(self)
+        config_dialog.show()
+
+    def clear_ai_history(self) -> None:
+        """清空AI对话历史"""
+        if hasattr(self, "ai_chat") and self.ai_chat:
+            self.ai_chat.clear_history()
+            self.speech_bubble.show("对话历史已清空~", duration=2000)
+
+    # ============ AI聊天面板功能 ============
+
+    def toggle_ai_chat_panel(self) -> None:
+        """切换AI聊天面板显示/隐藏"""
+        # 检查AI是否已配置
+        if not hasattr(self, "ai_chat") or not self.ai_chat:
+            self.speech_bubble.show("AI功能初始化失败~", duration=3000)
+            return
+
+        if not self.ai_chat.is_configured():
+            self.speech_bubble.show("AI功能未配置，请先设置API密钥哦~", duration=4000)
+            self.show_ai_config_dialog()
+            return
+
+        # 切换面板状态
+        if self.ai_chat_panel and self.ai_chat_panel.is_visible():
+            # 关闭面板
+            self.close_ai_chat_panel()
+        else:
+            # 打开面板
+            self._open_ai_chat_panel()
+
+    def _open_ai_chat_panel(self) -> None:
+        """打开AI聊天面板"""
+        # 关闭气泡对话框
+        self.speech_bubble.hide()
+
+        # 创建或显示面板
+        if not self.ai_chat_panel:
+            self.ai_chat_panel = AIChatPanel(self)
+
+        self.ai_chat_panel.show()
+
+    def close_ai_chat_panel(self) -> None:
+        """关闭AI聊天面板"""
+        if self.ai_chat_panel:
+            self.ai_chat_panel.close()
+            self.ai_chat_panel = None
+
+    def is_ai_chat_panel_visible(self) -> bool:
+        """检查AI聊天面板是否可见"""
+        return self.ai_chat_panel is not None and self.ai_chat_panel.is_visible()

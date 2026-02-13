@@ -117,3 +117,17 @@ REMINDERS = {
 AUTHOR_BILIBILI = "-fugu-"
 AUTHOR_EMAIL = "1977184420@qq.com"
 GITEE_RELEASES_URL = "https://gitee.com/lzy-buaa-jdi/ameath/releases"
+
+# ============ AI配置 ============
+AI_PROVIDER_DEEPSEEK = "deepseek"
+AI_PROVIDER_OPENAI = "openai"
+AI_PROVIDER_CLAUDE = "claude"
+
+AI_DEFAULT_MODELS = {
+    AI_PROVIDER_DEEPSEEK: "deepseek-chat",
+    AI_PROVIDER_OPENAI: "gpt-3.5-turbo",
+    AI_PROVIDER_CLAUDE: "claude-3-haiku-20240307",
+}
+
+# AI快捷键
+AI_CHAT_HOTKEY = "ctrl+shift+a"

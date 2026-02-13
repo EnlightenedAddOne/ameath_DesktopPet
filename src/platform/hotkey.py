@@ -35,6 +35,7 @@ VK_P = 0x50
 VK_Q = 0x51
 VK_S = 0x53
 VK_T = 0x54
+VK_A = 0x41
 
 
 class GlobalHotkey:
@@ -153,6 +154,13 @@ class GlobalHotkey:
             self._show_quick_menu,
         )
 
+        # Ctrl+Shift+A - AI对话
+        self.register(
+            MOD_CONTROL | MOD_SHIFT,
+            VK_A,
+            self._open_ai_chat,
+        )
+
     def register(
         self,
         modifiers: int,
@@ -235,6 +243,11 @@ class GlobalHotkey:
         """显示快捷菜单"""
         if self.app:
             self.app.quick_menu.show()
+
+    def _open_ai_chat(self) -> None:
+        """打开AI对话"""
+        if self.app:
+            self.app.open_ai_chat_dialog()
 
 
 # 全局实例

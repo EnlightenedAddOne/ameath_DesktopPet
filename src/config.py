@@ -2,7 +2,13 @@
 
 import json
 from typing import Any, Dict, Optional
-from src.constants import CONFIG_FILE, DEFAULT_SCALE_INDEX, DEFAULT_TRANSPARENCY_INDEX
+from src.constants import (
+    AI_DEFAULT_MODELS,
+    AI_PROVIDER_DEEPSEEK,
+    CONFIG_FILE,
+    DEFAULT_SCALE_INDEX,
+    DEFAULT_TRANSPARENCY_INDEX,
+)
 
 # 配置缓存
 _config_cache: Optional[Dict[str, Any]] = None
@@ -17,6 +23,13 @@ def _default_config() -> Dict[str, Any]:
         "click_through": True,
         "follow_mouse": False,
         "behavior_mode": "active",
+        # AI配置
+        "ai_enabled": False,
+        "ai_provider": AI_PROVIDER_DEEPSEEK,
+        "ai_api_key": "",
+        "ai_model": AI_DEFAULT_MODELS[AI_PROVIDER_DEEPSEEK],
+        "ai_base_url": "",
+        "ai_personality": "emys",
     }
 
 

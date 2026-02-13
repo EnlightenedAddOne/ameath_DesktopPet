@@ -364,6 +364,7 @@ class QuickMenu:
         group.pack(fill=tk.X, padx=8, pady=1)
 
         items: list[tuple[str | tk.StringVar, Callable[[], None]]] = [
+            ("🤖 AI对话", self._toggle_ai_chat),
             ("👻 穿透", self._toggle_click_through),
             ("🍅 开始/停", self._toggle_pomodoro),
             ("🍅 重置", self._reset_pomodoro),
@@ -494,4 +495,9 @@ class QuickMenu:
     def _quit(self) -> None:
         """退出程序"""
         self.app.request_quit()
+        self.hide()
+
+    def _toggle_ai_chat(self) -> None:
+        """切换AI对话面板"""
+        self.app.toggle_ai_chat_panel()
         self.hide()

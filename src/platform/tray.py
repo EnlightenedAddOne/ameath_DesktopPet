@@ -178,6 +178,51 @@ class TrayController:
             ),
         )
 
+    def _create_ai_menu(self) -> pystray.Menu:
+        """创建AI助手子菜单"""
+        # 快捷提问
+        quick_questions = [
+            ("讲个笑话", "讲个笑话"),
+            ("今天星期几", "今天星期几？"),
+            ("给我建议", "给我点建议"),
+            ("我累了", "我累了"),
+        ]
+
+        quick_items = []
+        for label, question in quick_questions:
+
+            def make_handler(q):
+                def handler(icon, item):
+                    self.app.quick_ai_chat(q)
+
+                return handler
+
+            quick_items.append(pystray.MenuItem(label, make_handler(question)))
+
+        return pystray.Menu(
+            pystray.MenuItem(
+                "开始对话",
+                lambda icon, item: self.app.open_ai_chat_dialog(),
+            ),
+            pystray.MenuItem(
+                "快捷提问",
+                pystray.Menu(*quick_items),
+            ),
+            pystray.MenuItem(
+                "随机话题",
+                lambda icon, item: self.app.quick_ai_chat(),
+            ),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(
+                "配置AI",
+                lambda icon, item: self.app.show_ai_config_dialog(),
+            ),
+            pystray.MenuItem(
+                "清空对话历史",
+                lambda icon, item: self.app.clear_ai_history(),
+            ),
+        )
+
     def build_menu(self) -> pystray.Menu:
         """构建托盘菜单"""
         return pystray.Menu(
@@ -195,6 +240,7 @@ class TrayController:
                 self._toggle_startup,
                 checked=lambda item: self.app.auto_startup,
             ),
+            pystray.MenuItem("AI助手", self._create_ai_menu()),
             pystray.MenuItem("行为模式", self._create_behavior_mode_menu()),
             pystray.MenuItem("番茄钟", self._create_pomodoro_menu()),
             pystray.MenuItem("缩放", self._create_scale_menu()),

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import random
 import time
 from typing import TYPE_CHECKING
 
 import tkinter as tk
+
+from src.constants import BEHAVIOR_MODE_QUIET
 
 if TYPE_CHECKING:
     from src.core.pet_core import DesktopPet
@@ -16,6 +19,7 @@ class ClickHandler:
 
     def __init__(self, app: "DesktopPet") -> None:
         self.app = app
+        self._click_animation_after_id = None
 
     def on_mouse_down(self, event: tk.Event) -> None:
         """鼠标按下事件 - 处理单击/双击/拖动"""
@@ -54,6 +58,30 @@ class ClickHandler:
         if app._drag_started:
             return
 
+        # 安静模式下随机播放 idle3 或 idle4 动画
+        if app.behavior_mode == BEHAVIOR_MODE_QUIET:
+            # 取消之前的定时器
+            if self._click_animation_after_id:
+                app.root.after_cancel(self._click_animation_after_id)
+                self._click_animation_after_id = None
+
+            idle_gifs = getattr(app, "idle_gifs", [])
+            if len(idle_gifs) >= 4:
+                # 随机选择 idle3 (index 2) 或 idle4 (index 3)
+                idx = random.choice([2, 3])
+                frames, delays = idle_gifs[idx]
+                app.current_frames = frames
+                app.current_delays = delays
+                app.frame_index = 0
+                if frames:
+                    app.label.config(image=frames[0])
+
+                # 2000ms 后切换回普通待机动画 (idle2)
+                self._click_animation_after_id = app.root.after(
+                    2000, self._restore_idle_animation
+                )
+            return
+
         if app._music_playing:
             if app.music_panel.is_visible():
                 app.music_panel.hide()
@@ -75,3 +103,22 @@ class ClickHandler:
         app._click_count = 0
         app._pending_drag = False
         app.quick_menu.show()
+
+    def _restore_idle_animation(self) -> None:
+        """恢复普通待机动画"""
+        self._click_animation_after_id = None
+        app = self.app
+
+        # 确保仍在安静模式
+        if app.behavior_mode != BEHAVIOR_MODE_QUIET:
+            return
+
+        idle_gifs = getattr(app, "idle_gifs", [])
+        if idle_gifs:
+            # 切换回 idle2 (index 1)
+            frames, delays = idle_gifs[1]
+            app.current_frames = frames
+            app.current_delays = delays
+            app.frame_index = 0
+            if frames:
+                app.label.config(image=frames[0])

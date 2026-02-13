@@ -55,6 +55,12 @@ class DragHandler:
                 app.pomodoro_indicator.update_position()
             if hasattr(app, "music_panel") and app.music_panel:
                 app.music_panel.update_position()
+            if (
+                hasattr(app, "ai_chat_panel")
+                and app.ai_chat_panel
+                and app.ai_chat_panel.is_visible()
+            ):
+                app.ai_chat_panel._update_position()
 
     def stop_drag(self, event: tk.Event) -> None:
         """停止拖动"""
