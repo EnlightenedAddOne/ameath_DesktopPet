@@ -223,6 +223,55 @@ class TrayController:
             ),
         )
 
+    def _create_translate_menu(self) -> pystray.Menu:
+        """创建翻译助手子菜单"""
+        from src.config import load_config, update_config
+
+        config = load_config()
+        translate_enabled = config.get("translate_enabled", False)
+
+        return pystray.Menu(
+            pystray.MenuItem(
+                "开启/关闭翻译",
+                self._toggle_translate,
+                checked=lambda item: translate_enabled,
+            ),
+            pystray.MenuItem(
+                "手动翻译",
+                lambda icon, item: self.app.translate_window.show(),
+            ),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(
+                "使用说明",
+                lambda icon, item: self._show_translate_help(),
+            ),
+        )
+
+    def _toggle_translate(self, icon: pystray.Icon) -> None:
+        """切换翻译功能"""
+        from src.config import load_config, update_config
+
+        config = load_config()
+        current = config.get("translate_enabled", False)
+        update_config(translate_enabled=not current)
+        icon.menu = self.build_menu()
+
+    def _show_translate_help(self) -> None:
+        """显示翻译使用说明"""
+        import tkinter as tk
+        from tkinter import messagebox
+
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showinfo(
+            "翻译助手使用说明",
+            "1. 选中需要翻译的文字\n"
+            "2. 按住 Ctrl 键超过1秒\n"
+            "3. 即可弹出翻译窗口\n\n"
+            "注意：需要先在AI配置中启用AI功能",
+        )
+        root.destroy()
+
     def build_menu(self) -> pystray.Menu:
         """构建托盘菜单"""
         return pystray.Menu(
@@ -241,6 +290,7 @@ class TrayController:
                 checked=lambda item: self.app.auto_startup,
             ),
             pystray.MenuItem("AI助手", self._create_ai_menu()),
+            pystray.MenuItem("翻译助手", self._create_translate_menu()),
             pystray.MenuItem("行为模式", self._create_behavior_mode_menu()),
             pystray.MenuItem("番茄钟", self._create_pomodoro_menu()),
             pystray.MenuItem("缩放", self._create_scale_menu()),

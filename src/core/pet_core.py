@@ -30,6 +30,7 @@ from src.interaction.drag_handler import DragHandler
 from src.media.music_controller import MusicController
 from src.ai import AIChatEngine, AIConfigDialog
 from src.ui.ai_chat_panel import AIChatPanel
+from src.translate import TranslateWindow
 
 
 class DesktopPet:
@@ -64,6 +65,9 @@ class DesktopPet:
 
         # AI聊天面板
         self.ai_chat_panel: AIChatPanel | None = None
+
+        # 翻译窗口
+        self.translate_window = TranslateWindow(self)
 
         # 初始化窗口
         self.window.init_window()

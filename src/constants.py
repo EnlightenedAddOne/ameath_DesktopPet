@@ -223,3 +223,17 @@ AI_DEFAULT_BASE_URLS = {
 
 # AI快捷键
 AI_CHAT_HOTKEY = "ctrl+shift+a"
+
+# 翻译目标语言
+TRANSLATE_LANGUAGES = {
+    "zh": "简体中文",
+    "en": "English",
+    "ja": "日本語",
+    "ko": "한국어",
+    "fr": "Français",
+    "de": "Deutsch",
+    "es": "Español",
+}
+
+# 默认目标语言
+DEFAULT_TRANSLATE_LANG = "zh"

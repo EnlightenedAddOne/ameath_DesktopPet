@@ -8,6 +8,8 @@ from src.constants import (
     CONFIG_FILE,
     DEFAULT_SCALE_INDEX,
     DEFAULT_TRANSPARENCY_INDEX,
+    DEFAULT_TRANSLATE_LANG,
+    TRANSLATE_LANGUAGES,
 )
 
 # 配置缓存
@@ -30,6 +32,9 @@ def _default_config() -> Dict[str, Any]:
         "ai_model": AI_DEFAULT_MODELS[AI_PROVIDER_DEEPSEEK],
         "ai_base_url": "",
         "ai_personality": "aemeath",
+        # 翻译配置
+        "translate_enabled": False,
+        "translate_target_lang": DEFAULT_TRANSLATE_LANG,
     }
 
 
