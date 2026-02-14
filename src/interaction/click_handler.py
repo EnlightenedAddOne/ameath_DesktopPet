@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import random
+import subprocess
 import time
 from typing import TYPE_CHECKING
 
@@ -20,10 +22,14 @@ class ClickHandler:
     def __init__(self, app: "DesktopPet") -> None:
         self.app = app
         self._click_animation_after_id = None
+        # 快速点击启动相关
+        self._rapid_click_times: list[float] = []
+        self._rapid_click_timeout = 2000  # 2秒时间窗口
 
     def on_mouse_down(self, event: tk.Event) -> None:
         """鼠标按下事件 - 处理单击/双击/拖动"""
         app = self.app
+
         if app.click_through:
             return
 
@@ -49,6 +55,10 @@ class ClickHandler:
         if app.dragging:
             app.drag.stop_drag(event)
         app._pending_drag = False
+
+    def on_right_click(self, event: tk.Event) -> None:
+        """鼠标右键点击事件 - 检测快速右键点击"""
+        self._check_rapid_clicks()
 
     def _handle_single_click(self, event: tk.Event) -> None:
         """处理单击"""
@@ -140,3 +150,48 @@ class ClickHandler:
             app.frame_index = 0
             if frames:
                 app.label.config(image=frames[0])
+
+    def _check_rapid_clicks(self) -> None:
+        """检测快速点击次数，触发快速启动"""
+        from src.config import load_config
+
+        config = load_config()
+        if not config.get("quick_launch_enabled", False):
+            return
+
+        exe_path = config.get("quick_launch_exe_path", "")
+        if not exe_path:
+            return
+
+        if not os.path.exists(exe_path):
+            return
+
+        click_count = config.get("quick_launch_click_count", 5)
+        current_time = time.time() * 1000
+
+        # 清理超出时间窗口的点击记录
+        self._rapid_click_times = [
+            t
+            for t in self._rapid_click_times
+            if current_time - t < self._rapid_click_timeout
+        ]
+
+        # 记录当前点击时间
+        self._rapid_click_times.append(current_time)
+
+        # 检查是否达到点击次数
+        if len(self._rapid_click_times) >= click_count:
+            self._rapid_click_times = []
+            self._launch_exe(exe_path)
+
+    def _launch_exe(self, exe_path: str) -> None:
+        """启动指定的exe程序"""
+        try:
+            subprocess.Popen(
+                exe_path,
+                cwd=os.path.dirname(exe_path),
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            )
+            self.app.speech_bubble.show("🚀 已启动程序", duration=2000)
+        except Exception as e:
+            self.app.speech_bubble.show(f"启动失败: {e}", duration=3000)

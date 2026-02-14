@@ -35,6 +35,10 @@ def _default_config() -> Dict[str, Any]:
         # 翻译配置
         "translate_enabled": False,
         "translate_target_lang": DEFAULT_TRANSLATE_LANG,
+        # 快速启动配置
+        "quick_launch_enabled": False,
+        "quick_launch_exe_path": "",
+        "quick_launch_click_count": 5,
     }
 
 

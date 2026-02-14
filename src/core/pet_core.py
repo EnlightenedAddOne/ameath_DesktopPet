@@ -128,6 +128,8 @@ class DesktopPet:
         self.label.bind("<ButtonPress-1>", self.click.on_mouse_down)
         self.label.bind("<B1-Motion>", self.drag.do_drag)
         self.label.bind("<ButtonRelease-1>", self.click.on_mouse_up)
+        # 右键点击事件
+        self.label.bind("<ButtonPress-3>", self.click.on_right_click)
 
     def _start_loops(self) -> None:
         """启动循环"""

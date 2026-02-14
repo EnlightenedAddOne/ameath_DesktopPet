@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 import pystray
@@ -272,6 +273,86 @@ class TrayController:
         )
         root.destroy()
 
+    def _create_quick_launch_menu(self) -> pystray.Menu:
+        """创建快速启动子菜单"""
+        from src.config import load_config, update_config
+
+        config = load_config()
+        quick_enabled = config.get("quick_launch_enabled", False)
+        exe_path = config.get("quick_launch_exe_path", "")
+
+        # 显示路径（截取文件名）
+        if exe_path:
+            display_path = os.path.basename(exe_path)
+        else:
+            display_path = "未设置"
+
+        return pystray.Menu(
+            pystray.MenuItem(
+                "开启/关闭",
+                self._toggle_quick_launch,
+                checked=lambda item: quick_enabled,
+            ),
+            pystray.MenuItem(
+                f"程序: {display_path}",
+                self._set_quick_launch_path,
+            ),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(
+                "使用说明",
+                self._show_quick_launch_help,
+            ),
+        )
+
+    def _toggle_quick_launch(self, icon: pystray.Icon) -> None:
+        """切换快速启动功能"""
+        from src.config import load_config, update_config
+
+        config = load_config()
+        current = config.get("quick_launch_enabled", False)
+        update_config(quick_launch_enabled=not current)
+        icon.menu = self.build_menu()
+
+    def _set_quick_launch_path(self, icon: pystray.Icon, item) -> None:
+        """设置快速启动的程序路径"""
+        import tkinter as tk
+        from tkinter import filedialog
+
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+
+        file_path = filedialog.askopenfilename(
+            title="选择要启动的程序",
+            filetypes=[("可执行文件", "*.exe"), ("所有文件", "*.*")],
+        )
+
+        root.destroy()
+
+        if file_path:
+            from src.config import update_config
+
+            update_config(quick_launch_exe_path=file_path)
+            icon.menu = self.build_menu()
+
+    def _show_quick_launch_help(self) -> None:
+        """显示快速启动使用说明"""
+        import tkinter as tk
+        from tkinter import messagebox
+
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showinfo(
+            "快速启动使用说明",
+            "快速启动程序：\n"
+            "1. 先在托盘菜单中设置要启动的程序\n"
+            "2. 关闭鼠标穿透功能\n"
+            "3. 在宠物上快速点击5次（2秒内）\n"
+            "4. 即可启动设定的程序\n\n"
+            "提示：点击太快可能导致触发失败",
+        )
+        root.destroy()
+
     def build_menu(self) -> pystray.Menu:
         """构建托盘菜单"""
         return pystray.Menu(
@@ -289,6 +370,7 @@ class TrayController:
                 self._toggle_startup,
                 checked=lambda item: self.app.auto_startup,
             ),
+            pystray.MenuItem("快速启动", self._create_quick_launch_menu()),
             pystray.MenuItem("AI助手", self._create_ai_menu()),
             pystray.MenuItem("翻译助手", self._create_translate_menu()),
             pystray.MenuItem("行为模式", self._create_behavior_mode_menu()),
