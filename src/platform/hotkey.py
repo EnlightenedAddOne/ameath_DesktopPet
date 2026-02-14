@@ -129,37 +129,9 @@ class GlobalHotkey:
         )
 
     def _register_default_hotkeys(self) -> None:
-        """注册默认快捷键"""
-        if not self.app:
-            return
-
-        # Ctrl+Shift+H - 显示/隐藏
-        self.register(
-            MOD_CONTROL | MOD_SHIFT,
-            VK_H,
-            self._toggle_visible,
-        )
-
-        # Ctrl+Shift+Q - 退出
-        self.register(
-            MOD_CONTROL | MOD_SHIFT,
-            VK_Q,
-            self._quit,
-        )
-
-        # Ctrl+Shift+S - 显示快捷菜单
-        self.register(
-            MOD_CONTROL | MOD_SHIFT,
-            VK_S,
-            self._show_quick_menu,
-        )
-
-        # Ctrl+Shift+A - AI对话
-        self.register(
-            MOD_CONTROL | MOD_SHIFT,
-            VK_A,
-            self._open_ai_chat,
-        )
+        """注册默认快捷键（已禁用）"""
+        # 快捷键功能已移除
+        pass
 
     def register(
         self,
