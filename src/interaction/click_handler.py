@@ -60,6 +60,21 @@ class ClickHandler:
 
         # 安静模式下随机播放 idle3 或 idle4 动画
         if app.behavior_mode == BEHAVIOR_MODE_QUIET:
+            # 音乐播放时禁止单击动画切换和气泡显示
+            if app._music_playing:
+                # 音乐播放模式下单击时显示歌名和音乐控制组件
+                if app.music_panel.is_visible():
+                    app.music_panel.hide()
+                    app.speech_bubble.hide()
+                else:
+                    app.music_panel.show()
+                    title = app.get_current_music_title()
+                    if title:
+                        app.speech_bubble.show(
+                            f"🎵 {title}", duration=None, allow_during_music=True
+                        )
+                return
+
             # 取消之前的定时器
             if self._click_animation_after_id:
                 app.root.after_cancel(self._click_animation_after_id)
@@ -84,6 +99,7 @@ class ClickHandler:
             app.speech_bubble.show_click_reaction()
             return
 
+        # 音乐播放模式下显示歌名和音乐控制组件
         if app._music_playing:
             if app.music_panel.is_visible():
                 app.music_panel.hide()

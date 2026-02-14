@@ -32,7 +32,7 @@ def get_behavior_params(mode: str) -> BehaviorParams:
     if mode == BEHAVIOR_MODE_QUIET:
         return BehaviorParams(
             follow_override=False,
-            stop_chance=min(STOP_CHANCE * 2.0, 0.9),
+            stop_chance=min(STOP_CHANCE * 20.0, 0.9),
             rest_chance=min(REST_CHANCE * 1.5, 0.95),
             target_min=int(TARGET_CHANGE_MIN * 1.6),
             target_max=int(TARGET_CHANGE_MAX * 1.6),
@@ -43,7 +43,7 @@ def get_behavior_params(mode: str) -> BehaviorParams:
     if mode == BEHAVIOR_MODE_CLINGY:
         return BehaviorParams(
             follow_override=True,
-            stop_chance=max(STOP_CHANCE * 0.3, 0.0001),
+            stop_chance=max(STOP_CHANCE * 0.1, 0.0001),
             rest_chance=max(REST_CHANCE * 0.3, 0.05),
             target_min=int(TARGET_CHANGE_MIN * 0.7),
             target_max=int(TARGET_CHANGE_MAX * 0.7),

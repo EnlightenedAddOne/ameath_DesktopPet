@@ -190,6 +190,8 @@ class MusicController:
         app.animation.restore_animation_after_music()
         if hasattr(app, "music_panel") and app.music_panel:
             app.music_panel.hide()
+        if hasattr(app, "speech_bubble") and app.speech_bubble:
+            app.speech_bubble.hide()
 
     def pause(self) -> None:
         """暂停音乐"""

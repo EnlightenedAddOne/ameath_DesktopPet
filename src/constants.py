@@ -25,9 +25,9 @@ INERTIA_FACTOR = 0.95  # 惯性因子
 INTENT_FACTOR = 0.05  # 意图因子
 
 # ============ 行为配置 ============
-STOP_CHANCE = 0.003  # 每帧停下的概率
-STOP_DURATION_MIN = 4000  # 最小停止时间(ms)
-STOP_DURATION_MAX = 8000  # 最大停止时间(ms)
+STOP_CHANCE = 0.0003  # 每帧停下的概率
+STOP_DURATION_MIN = 5000  # 最小停止时间(ms)
+STOP_DURATION_MAX = 5000  # 最大停止时间(ms)
 EDGE_ESCAPE_CHANCE = 0.3  # 撞边后直接消失概率
 RESPAWN_MARGIN = 50  # 重生在屏幕外多少像素
 
