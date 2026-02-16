@@ -644,13 +644,16 @@ class GlobalHotkey:
         try:
             text = ""
             if self._last_selected_at is not None:
+                # 只要有划词记录就允许翻译（可以放宽时间限制，或者保持10秒限制）
+                # 这里保持原逻辑：划词后5秒内有效
                 if (
                     time.time() - self._last_selected_at
-                ) <= 10 and self._last_selected_text.strip():
+                ) <= 5 and self._last_selected_text.strip():
                     text = self._last_selected_text.strip()
-
-            if not text:
-                text = self._get_clipboard_text().strip()
+            
+            # 删除自动读取剪贴板的兜底逻辑，确保只有划词后才触发
+            # if not text:
+            #     text = self._get_clipboard_text().strip()
 
             if text:
                 # 设置标志防止重复触发
