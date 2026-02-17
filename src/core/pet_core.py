@@ -100,17 +100,43 @@ class DesktopPet:
     def _load_config(self) -> None:
         """加载配置"""
         config = load_config()
+        
+        # 标记配置是否需要保存（如果发生修正，则设为True）
+        config_needs_update = False
 
         self.scale_index = config.get("scale_index", DEFAULT_SCALE_INDEX)
+
+        # === 新增：校验索引是否越界 ===
+        # 如果读取到的索引超出了当前选项的范围，强制重置为默认值
+        if not (0 <= self.scale_index < len(SCALE_OPTIONS)):
+            # print(f"检测到无效的缩放配置: {self.scale_index}，已重置") # 调试用
+            self.scale_index = DEFAULT_SCALE_INDEX
+            config_needs_update = True
+        # ==========================
+
         self.scale_options = SCALE_OPTIONS
         self.transparency_index = config.get(
             "transparency_index", DEFAULT_TRANSPARENCY_INDEX
         )
+
+        # === 新增：校验透明度索引是否越界 ===
+        if not (0 <= self.transparency_index < len(TRANSPARENCY_OPTIONS)):
+            self.transparency_index = DEFAULT_TRANSPARENCY_INDEX
+            config_needs_update = True
+        # ==================================
+
         self.auto_startup = config.get("auto_startup", False)
         self.click_through = config.get("click_through", True)
         self.follow_mouse = config.get("follow_mouse", False)
         self.behavior_mode = config.get("behavior_mode", BEHAVIOR_MODE_ACTIVE)
         self.scale = SCALE_OPTIONS[self.scale_index]
+
+        # 如果发现配置有误并进行了修正，立即保存到文件
+        if config_needs_update:
+            update_config(
+                scale_index=self.scale_index,
+                transparency_index=self.transparency_index
+            )
 
         # 应用透明度
         self.set_transparency(self.transparency_index, persist=False)

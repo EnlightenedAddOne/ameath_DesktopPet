@@ -18,6 +18,76 @@
 
 ---
 
+## 📁 项目结构
+
+```
+ameath/
+├── assets/                  # 资源文件
+│   ├── gifs/               # 宠物动画 GIF 序列
+│   ├── icon/               # 托盘图标及其他 UI 图标
+│   ├── music/              # 背景音乐 (格式: "歌名 - 歌手.mp3")
+│   └── voice/              # 语音反馈文件
+├── src/                    # 源代码目录
+│   ├── ai/                 # AI 对话模块
+│   │   ├── chat_engine.py      # AI 对话引擎
+│   │   ├── config_dialog.py    # AI 配置窗口
+│   │   └── emys_character.py   # 爱弥斯人设管理
+│   ├── animation/          # 动画管理模块
+│   │   ├── animation_manager.py # 动画加载与播放逻辑
+│   │   └── gif_utils.py        # GIF 帧处理工具
+│   ├── behavior/           # 行为控制模块
+│   │   ├── motion_controller.py # 运动控制（移动、跳跃等）
+│   │   ├── routine_manager.py   # 作息管理（提醒、休息）
+│   │   └── behavior_modes.py    # 行为模式（安静/活泼等）
+│   ├── core/               # 核心系统模块
+│   │   ├── pet_core.py         # 宠物主类 (DesktopPet)
+│   │   ├── state_manager.py    # 状态机管理
+│   │   └── window_manager.py   # 窗口管理（置顶、透明度）
+│   ├── interaction/        # 交互处理模块
+│   │   ├── click_handler.py    # 点击事件处理
+│   │   └── drag_handler.py     # 拖动事件处理
+│   ├── media/              # 多媒体模块
+│   │   └── music_controller.py # 音乐播放控制
+│   ├── net/                # 网络模块
+│   │   └── version_checker.py  # 版本更新检查
+│   ├── platform/           # 平台相关模块
+│   │   ├── hotkey.py           # 全局快捷键
+│   │   ├── system.py           # Windows API 封装
+│   │   └── tray.py             # 系统托盘实现
+│   ├── productivity/       # 效率工具模块
+│   │   └── pomodoro.py         # 番茄钟逻辑
+│   ├── translate/          # 翻译功能模块
+│   └── ui/                 # UI 组件模块
+│       ├── ai_chat_panel.py    # AI 聊天面板
+│       ├── music_panel.py      # 音乐播放面板
+│       ├── quick_menu.py       # 快捷菜单
+│       └── speech_bubble.py    # 气泡对话框
+├── main.py                 # 程序主入口
+├── ameath.spec             # PyInstaller 打包配置文件
+├── requirements.txt        # Python 依赖清单
+└── config.py               # 全局配置加载与保存
+```
+
+## 🔨 开发与编译
+
+### 环境准备
+```bash
+# 安装依赖
+pip install -r requirements.txt
+```
+
+### 运行开发版
+```bash
+python main.py
+```
+
+### 编译打包
+使用 PyInstaller 进行打包：
+```bash
+pyinstaller ameath.spec
+```
+编译完成后，可执行文件将生成在 `dist/` 目录下。
+
 ## ✨ 特色功能
 
 ### ⚡ 快速启动功能
@@ -52,6 +122,8 @@
 
 ### 🎵 多媒体
 - 🎵 **背景音乐** - 支持播放背景音乐
+  - 支持格式：MP3
+  - 命名规范：请将音乐文件放入 `assets/music/` 目录，并命名为 `歌名 - 歌手.mp3`
 - 💬 **对话气泡** - 点击宠物显示问候语和互动
 
 ### 🎨 界面定制
@@ -76,7 +148,7 @@
 2. **托盘菜单** - 右键点击系统托盘图标进行设置
 3. **快捷操作** - 双击宠物显示快捷菜单，单击显示对话气泡
 4. **拖动宠物** - 需关闭鼠标穿透后，左键拖动宠物
-5. **AI对话** - 使用 `Ctrl+Shift+A` 或双击宠物后点击AI按钮打开
+
 
 ### 托盘菜单功能
 
