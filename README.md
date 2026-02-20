@@ -10,7 +10,7 @@
 
 ### 项目演示视频：[【爱弥斯-多功能桌宠】ai聊天、番茄时钟、划词翻译、音乐播放、鸣潮快速启动](https://www.bilibili.com/video/BV1qnZWBuE7K/) 
 
-### [ameath_DesktopPet wiki](https://github.com/EnlightenedAddOne/ameath_DesktopPet/wiki/%E9%A6%96%E9%A1%B5)
+### 详细使用说明：[ameath_DesktopPet wiki](https://github.com/EnlightenedAddOne/ameath_DesktopPet/wiki/%E9%A6%96%E9%A1%B5)
 
 本项目在原版 [Ameath](https://gitee.com/lzy-buaa-jdi/ameath) 基础上进行二次开发，添加了更多实用功能。
 
