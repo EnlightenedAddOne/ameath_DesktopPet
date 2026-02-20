@@ -240,6 +240,14 @@ class MusicController:
                 app._music_pause_start = 0.0
                 app._music_paused_total = 0.0
 
+                # 更新气泡显示（与手动切换保持一致）
+                if hasattr(app, "speech_bubble") and app.speech_bubble.is_visible():
+                    title = self.get_current_title()
+                    if title:
+                        app.speech_bubble.show(
+                            f"🎵 {title}", duration=None, allow_during_music=True
+                        )
+
         app._music_after_id = app.root.after(500, self._check_end)
 
     def _load_playlist(self) -> list[str]:

@@ -88,6 +88,4 @@ class ScreenAnalyzer:
 ## 2. 音效添加
 
 
----
 
-## 3. 翻译功能
